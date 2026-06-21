@@ -1,6 +1,12 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { HandleMessageStreamEvent } from "eve/client";
+import {
+  createAuthProfileRedactor,
+  createAuthRuntimeTools,
+  type AuthRuntimeTools,
+  type LoginWithProfileResult,
+} from "./auth-profiles.js";
 import { loadQaAgentConfig, type TargetPlatform } from "./config.js";
 import {
   qaReportOrBlocked,
@@ -17,6 +23,7 @@ import {
   type MobileDeviceRuntimeTools,
   type MobileDeviceToolResult,
 } from "./mobile-device-driver.js";
+import { redactJsonValue, type SecretRedactor } from "./redaction.js";
 
 type SuccessfulMobileDeviceToolResult = Extract<
   MobileDeviceToolResult,
@@ -93,19 +100,32 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
   const driver = options.mockDeviceDriver
     ? createMockMobileDeviceDriver()
     : createAgentDeviceDriver({ platform: options.platform });
+  const redactor = createAuthProfileRedactor(configResult.config.authProfiles);
+  const authProfileName = Object.keys(configResult.config.authProfiles)[0];
   const runtime = createFixtureEveRuntime(
     createMobileDeviceRuntimeTools(
       driver,
       configResult.config.actionSafetyPolicy,
     ),
+    createAuthRuntimeTools({
+      profiles: configResult.config.authProfiles,
+      driver,
+      policy: configResult.config.actionSafetyPolicy,
+    }),
+    authProfileName,
     options.mockReportPath,
+    redactor,
   );
-  const report = await collectReportFromEveSession(runtime, {
-    message: buildRunMessage(prContextResult.value, options.platform),
-    prContext: prContextResult.value,
-    platform: options.platform,
-    outDir: options.outDir,
-  });
+  const report = await collectReportFromEveSession(
+    runtime,
+    {
+      message: buildRunMessage(prContextResult.value, options.platform),
+      prContext: prContextResult.value,
+      platform: options.platform,
+      outDir: options.outDir,
+    },
+    redactor,
+  );
 
   const reportPath = path.join(options.outDir, "qa-report.json");
   await mkdir(options.outDir, { recursive: true });
@@ -126,13 +146,37 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
 
 function createFixtureEveRuntime(
   tools: MobileDeviceRuntimeTools,
+  authTools: AuthRuntimeTools,
+  authProfileName: string | undefined,
   mockReportPath: string | undefined,
+  redactor: SecretRedactor,
 ): EveSessionRuntime {
   return {
     async *send(input) {
       yield eveEvent("session.started", { sessionId: "qa-agent-fixture-session" });
       yield eveEvent("turn.started", { platform: input.platform });
       yield eveEvent("message.received", { message: input.message });
+
+      let login: LoginWithProfileResult | undefined;
+      if (authProfileName) {
+        login = await authTools.loginWithProfile({ profileName: authProfileName });
+        yield eveEvent("action.result", {
+          name: "login_with_profile",
+          status: login.ok ? "completed" : "failed",
+          result: redactJsonValue(login, redactor),
+        });
+        if (!login.ok) {
+          yield eveEvent("turn.failed", {
+            message: login.reason,
+            diagnostics: login.diagnostics,
+          });
+          yield eveEvent("turn.completed", { finishReason: "tool_failed" });
+          yield eveEvent("session.completed", {
+            sessionId: "qa-agent-fixture-session",
+          });
+          return;
+        }
+      }
 
       const screen = await tools.inspectUi({ interactiveOnly: true });
       yield eveEvent("action.result", {
@@ -168,7 +212,10 @@ function createFixtureEveRuntime(
 
       const reportResult =
         mockReportPath === undefined
-          ? { ok: true as const, value: defaultMockReport(input, screenshot) }
+          ? {
+              ok: true as const,
+              value: defaultMockReport(input, screenshot, Boolean(login?.ok)),
+            }
           : await readMockReport(mockReportPath);
 
       if (!reportResult.ok) {
@@ -225,13 +272,14 @@ async function readJsonFile(
 async function collectReportFromEveSession(
   runtime: EveSessionRuntime,
   input: EveSessionInput,
+  redactor: SecretRedactor,
 ): Promise<QaReport> {
   const diagnostics: string[] = [];
   const writeReports: unknown[] = [];
 
   for await (const event of runtime.send(input)) {
     if (event.type === "turn.failed" || event.type === "session.failed") {
-      diagnostics.push(readFailureMessage(event.data));
+      diagnostics.push(redactor(readFailureMessage(event.data)));
     }
 
     if (event.type !== "action.result") {
@@ -240,7 +288,7 @@ async function collectReportFromEveSession(
 
     const action = event.data as { name?: string; result?: unknown };
     if (action.name === "write_report") {
-      writeReports.push(action.result);
+      writeReports.push(redactJsonValue(action.result, redactor));
     }
   }
 
@@ -259,21 +307,25 @@ async function collectReportFromEveSession(
     ]);
   }
 
-  return reportResult.value;
+  return redactJsonValue(reportResult.value, redactor);
 }
 
 function defaultMockReport(
   input: EveSessionInput,
   screenshot: SuccessfulMobileDeviceToolResult,
+  loggedIn: boolean,
 ): QaReport {
+  const checksPerformed = [
+    "Loaded PR Context",
+    ...(loggedIn ? ["Logged in with a configured Auth Profile"] : []),
+    "Inspected mobile screen through the Mobile Device Driver",
+    "Captured screenshot evidence through the Mobile Device Driver",
+  ];
+
   return {
     status: "passed",
     summary: `Mocked ${input.platform} QA Run completed for PR #${input.prContext.pullRequestNumber}.`,
-    checksPerformed: [
-      "Loaded PR Context",
-      "Inspected mobile screen through the Mobile Device Driver",
-      "Captured screenshot evidence through the Mobile Device Driver",
-    ],
+    checksPerformed,
     issuesFound: [],
     screenshots: [
       {

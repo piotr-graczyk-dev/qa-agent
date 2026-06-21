@@ -1,5 +1,6 @@
 import { loadQaAgentConfig, type QaAgentConfig } from "./config.js";
 import { checkAgentDeviceAvailability } from "./mobile-device-driver.js";
+import { readAuthProfileSecretEnvNames } from "./auth-profiles.js";
 
 export type DoctorResult =
   | { ok: true; messages: string[] }
@@ -50,18 +51,28 @@ export async function runDoctor(configPath: string): Promise<DoctorResult> {
 }
 
 function validateCredentials(config: QaAgentConfig): string[] {
-  if (config.screenshotStorage.provider !== "vercel-blob") {
-    return [];
+  const issues: string[] = [];
+
+  if (config.screenshotStorage.provider === "vercel-blob") {
+    const tokenEnv = config.screenshotStorage.tokenEnv;
+    if (!process.env[tokenEnv]?.trim()) {
+      issues.push(
+        `screenshotStorage: Vercel Blob storage requires ${tokenEnv} to be set.`,
+      );
+    }
   }
 
-  const tokenEnv = config.screenshotStorage.tokenEnv;
-  if (process.env[tokenEnv]?.trim()) {
-    return [];
+  for (const [profileName, profile] of Object.entries(config.authProfiles)) {
+    for (const envName of readAuthProfileSecretEnvNames({ [profileName]: profile })) {
+      if (!process.env[envName]?.trim()) {
+        issues.push(
+          `authProfiles.${profileName}: ${profile.type} Auth Profile requires ${envName} to be set.`,
+        );
+      }
+    }
   }
 
-  return [
-    `screenshotStorage: Vercel Blob storage requires ${tokenEnv} to be set.`,
-  ];
+  return issues;
 }
 
 function validateAgentDevice(): string[] {

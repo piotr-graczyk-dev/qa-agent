@@ -105,6 +105,63 @@ describe("qa-agent doctor", () => {
     assert.match(result.stderr, /Vercel Blob storage requires QA_AGENT_BLOB_TOKEN/);
   });
 
+  it("reports a clear doctor failure when Auth Profile secret env vars are missing", () => {
+    const projectDir = mkdtempSync(path.join(tmpdir(), "qa-agent-auth-profile-"));
+    writeFileSync(
+      path.join(projectDir, "qa-agent.config.mjs"),
+      `export default ${JSON.stringify(
+        {
+          targetPlatforms: ["android"],
+          model: {
+            provider: "openai",
+            modelId: "gpt-4.1",
+            apiKeyEnv: "OPENAI_API_KEY",
+          },
+          app: {
+            adapter: "expo-eas",
+            easProjectId: "00000000-0000-0000-0000-000000000000",
+            android: {
+              applicationId: "com.example.qaagent",
+            },
+          },
+          screenshotStorage: {
+            provider: "artifact",
+            artifactsDir: "qa-agent/screenshots",
+          },
+          actionSafetyPolicy: {
+            mode: "safe_only",
+          },
+          authProfiles: {
+            qa_user: {
+              type: "email_password",
+              emailEnv: "QA_AGENT_LOGIN_EMAIL",
+              passwordEnv: "QA_AGENT_LOGIN_PASSWORD",
+              emailField: 'id="email"',
+              passwordField: 'id="password"',
+            },
+          },
+        },
+        null,
+        2,
+      )};\n`,
+      "utf8",
+    );
+    const result = runCliWithEnv(
+      ["doctor", "--project", projectDir],
+      fakeAgentDeviceEnv({
+        QA_AGENT_LOGIN_EMAIL: "qa@example.com",
+        QA_AGENT_LOGIN_PASSWORD: "",
+      }),
+    );
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /environment issue/);
+    assert.match(result.stderr, /authProfiles\.qa_user/);
+    assert.match(result.stderr, /QA_AGENT_LOGIN_PASSWORD/);
+    assert.doesNotMatch(result.stderr, /qa@example\.com/);
+  });
+
   it("reports a clear doctor failure when agent-device is missing", () => {
     const result = runCliWithoutAgentDevice([
       "doctor",

@@ -1,6 +1,7 @@
 import { pathToFileURL } from "node:url";
 import { z } from "zod";
 import { actionSafetyPolicySchema } from "./action-safety.js";
+import { authProfilesSchema } from "./auth-profiles.js";
 
 export const targetPlatformSchema = z.enum(["android", "ios"]);
 
@@ -64,6 +65,7 @@ export const qaAgentConfigSchema = z
     }),
     screenshotStorage: screenshotStorageSchema,
     actionSafetyPolicy: actionSafetyPolicySchema,
+    authProfiles: authProfilesSchema,
   })
   .superRefine((config, ctx) => {
     if (config.targetPlatforms.includes("android") && !config.app.android) {

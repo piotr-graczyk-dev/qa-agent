@@ -91,6 +91,7 @@ describe("qa-agent init", () => {
     assert.match(config, /artifactsDir: "qa-agent\/screenshots"/);
     assert.match(config, /actionSafetyPolicy/);
     assert.match(config, /mode: "safe_only"/);
+    assert.match(config, /authProfiles: \{\}/);
 
     const workflow = await readFile(
       path.join(projectDir, ".eas", "workflows", "qa-agent-android.yml"),

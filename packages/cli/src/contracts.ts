@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { defaultSecretRedactor, redactJsonValue } from "./redaction.js";
 
 export const qaStatusSchema = z.enum(["passed", "failed", "blocked", "unsure"]);
 
@@ -109,7 +110,8 @@ export function qaReportOrBlocked(
   input: unknown,
   diagnostics: string[] = [],
 ): QaReport {
-  const result = qaReportSchema.safeParse(input);
+  const redactedInput = redactJsonValue(input, defaultSecretRedactor);
+  const result = qaReportSchema.safeParse(redactedInput);
   if (result.success) {
     return result.data;
   }
@@ -125,7 +127,10 @@ export function qaReportOrBlocked(
     checksPerformed: [],
     issuesFound: [],
     screenshots: [],
-    diagnostics: [...sanitizeDiagnostics(diagnostics), ...validationDiagnostics],
+    diagnostics: [
+      ...sanitizeDiagnostics(diagnostics).map(defaultSecretRedactor),
+      ...validationDiagnostics.map(defaultSecretRedactor),
+    ],
   };
 }
 
