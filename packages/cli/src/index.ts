@@ -1,4 +1,14 @@
 export {
+  actionSafetyPolicySchema,
+  evaluateActionSafetyPolicy,
+  forbiddenMobileActionIntents,
+  safeMobileActionIntents,
+  type ActionSafetyDecision,
+  type ActionSafetyPolicy,
+  type ForbiddenMobileActionIntent,
+  type SafeMobileActionIntent,
+} from "./action-safety.js";
+export {
   QA_AGENT_COMMENT_MARKER,
   createGitHubCommentClient,
   loadPlatformReport,
@@ -10,6 +20,18 @@ export {
   type PlatformReport,
   type UpsertQaReportCommentResult,
 } from "./comment.js";
+export {
+  buildScreenshotPath,
+  checkAgentDeviceAvailability,
+  createAgentDeviceDriver,
+  createMobileDeviceRuntimeTools,
+  createMockMobileDeviceDriver,
+  type AgentDeviceAvailability,
+  type MobileDeviceCommandResult,
+  type MobileDeviceDriver,
+  type MobileDeviceRuntimeTools,
+  type MobileDeviceToolResult,
+} from "./mobile-device-driver.js";
 export {
   defineQaAgentConfig,
   loadQaAgentConfig,

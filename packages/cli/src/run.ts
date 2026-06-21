@@ -9,6 +9,19 @@ import {
   type PrContext,
   type QaReport,
 } from "./contracts.js";
+import {
+  buildScreenshotPath,
+  createAgentDeviceDriver,
+  createMobileDeviceRuntimeTools,
+  createMockMobileDeviceDriver,
+  type MobileDeviceRuntimeTools,
+  type MobileDeviceToolResult,
+} from "./mobile-device-driver.js";
+
+type SuccessfulMobileDeviceToolResult = Extract<
+  MobileDeviceToolResult,
+  { ok: true }
+>;
 
 export type RunOptions = {
   configPath: string;
@@ -16,6 +29,7 @@ export type RunOptions = {
   platform: TargetPlatform;
   prContextPath: string;
   mockReportPath?: string;
+  mockDeviceDriver?: boolean;
 };
 
 export type RunResult =
@@ -30,11 +44,7 @@ type EveSessionInput = {
   message: string;
   prContext: PrContext;
   platform: TargetPlatform;
-};
-
-type MockMobileDeviceDriver = {
-  inspectScreen(): Promise<{ screenName: string; visibleText: string[] }>;
-  takeScreenshot(): Promise<{ path: string; caption: string }>;
+  outDir: string;
 };
 
 export async function runQaAgent(options: RunOptions): Promise<RunResult> {
@@ -80,12 +90,21 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
     };
   }
 
-  const driver = createMockMobileDeviceDriver();
-  const runtime = createFixtureEveRuntime(driver, options.mockReportPath);
+  const driver = options.mockDeviceDriver
+    ? createMockMobileDeviceDriver()
+    : createAgentDeviceDriver({ platform: options.platform });
+  const runtime = createFixtureEveRuntime(
+    createMobileDeviceRuntimeTools(
+      driver,
+      configResult.config.actionSafetyPolicy,
+    ),
+    options.mockReportPath,
+  );
   const report = await collectReportFromEveSession(runtime, {
     message: buildRunMessage(prContextResult.value, options.platform),
     prContext: prContextResult.value,
     platform: options.platform,
+    outDir: options.outDir,
   });
 
   const reportPath = path.join(options.outDir, "qa-report.json");
@@ -106,7 +125,7 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
 }
 
 function createFixtureEveRuntime(
-  driver: MockMobileDeviceDriver,
+  tools: MobileDeviceRuntimeTools,
   mockReportPath: string | undefined,
 ): EveSessionRuntime {
   return {
@@ -115,19 +134,37 @@ function createFixtureEveRuntime(
       yield eveEvent("turn.started", { platform: input.platform });
       yield eveEvent("message.received", { message: input.message });
 
-      const screen = await driver.inspectScreen();
+      const screen = await tools.inspectUi({ interactiveOnly: true });
       yield eveEvent("action.result", {
-        name: "inspect_screen",
-        status: "completed",
+        name: "inspect_ui",
+        status: screen.ok ? "completed" : "failed",
         result: screen,
       });
+      if (!screen.ok) {
+        yield toolFailureEvent("inspect_ui", screen);
+        yield eveEvent("turn.completed", { finishReason: "tool_failed" });
+        yield eveEvent("session.completed", {
+          sessionId: "qa-agent-fixture-session",
+        });
+        return;
+      }
 
-      const screenshot = await driver.takeScreenshot();
+      const screenshot = await tools.takeScreenshot({
+        path: buildScreenshotPath(input.outDir, input.platform),
+      });
       yield eveEvent("action.result", {
         name: "take_screenshot",
-        status: "completed",
+        status: screenshot.ok ? "completed" : "failed",
         result: screenshot,
       });
+      if (!screenshot.ok) {
+        yield toolFailureEvent("take_screenshot", screenshot);
+        yield eveEvent("turn.completed", { finishReason: "tool_failed" });
+        yield eveEvent("session.completed", {
+          sessionId: "qa-agent-fixture-session",
+        });
+        return;
+      }
 
       const reportResult =
         mockReportPath === undefined
@@ -225,38 +262,56 @@ async function collectReportFromEveSession(
   return reportResult.value;
 }
 
-function createMockMobileDeviceDriver(): MockMobileDeviceDriver {
-  return {
-    async inspectScreen() {
-      return {
-        screenName: "FixtureHome",
-        visibleText: ["Welcome", "Start learning", "Profile"],
-      };
-    },
-    async takeScreenshot() {
-      return {
-        path: "artifacts/screenshots/fixture-home.png",
-        caption: "Mocked fixture home screen",
-      };
-    },
-  };
-}
-
 function defaultMockReport(
   input: EveSessionInput,
-  screenshot: { path: string; caption: string },
+  screenshot: SuccessfulMobileDeviceToolResult,
 ): QaReport {
   return {
     status: "passed",
     summary: `Mocked ${input.platform} QA Run completed for PR #${input.prContext.pullRequestNumber}.`,
     checksPerformed: [
       "Loaded PR Context",
-      "Inspected mocked mobile screen",
-      "Captured mocked screenshot evidence",
+      "Inspected mobile screen through the Mobile Device Driver",
+      "Captured screenshot evidence through the Mobile Device Driver",
     ],
     issuesFound: [],
-    screenshots: [screenshot],
+    screenshots: [
+      {
+        path: readScreenshotPath(screenshot, input.outDir, input.platform),
+        caption: "QA Agent mobile screenshot evidence",
+      },
+    ],
   };
+}
+
+function readScreenshotPath(
+  screenshot: SuccessfulMobileDeviceToolResult,
+  outDir: string,
+  platform: TargetPlatform,
+): string {
+  try {
+    const parsed = JSON.parse(screenshot.result.stdout) as {
+      path?: unknown;
+      outPath?: unknown;
+    };
+    const candidate = parsed.path ?? parsed.outPath;
+    if (typeof candidate === "string" && candidate.trim()) {
+      return candidate;
+    }
+  } catch {
+    return buildScreenshotPath(outDir, platform);
+  }
+
+  return buildScreenshotPath(outDir, platform);
+}
+
+function toolFailureEvent(
+  name: string,
+  result: Exclude<MobileDeviceToolResult, { ok: true }>,
+): HandleMessageStreamEvent {
+  return eveEvent("turn.failed", {
+    message: `${name} was blocked by Action Safety Policy: ${result.reason}`,
+  });
 }
 
 function buildRunMessage(prContext: PrContext, platform: TargetPlatform): string {

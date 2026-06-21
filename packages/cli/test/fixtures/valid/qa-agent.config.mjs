@@ -18,4 +18,7 @@ export default defineQaAgentConfig({
     provider: "artifact",
     artifactsDir: "qa-agent/screenshots",
   },
+  actionSafetyPolicy: {
+    mode: "safe_only",
+  },
 });
