@@ -25,6 +25,12 @@ const iosReportPath = path.join(
   "reports",
   "ios-failed.json",
 );
+const blobScreenshotReportPath = path.join(
+  testDir,
+  "fixtures",
+  "reports",
+  "blob-screenshot.json",
+);
 
 function runCli(args) {
   return spawnSync(process.execPath, [cliPath, ...args], {
@@ -84,6 +90,21 @@ describe("QA Report comment rendering", () => {
     assert.match(result.stdout, /\| Android \| Passed \|/);
     assert.match(result.stdout, /\| iOS \| Failed \|/);
     assert.equal(result.stderr, "");
+  });
+
+  it("renders screenshot storage metadata as inline links when available", async () => {
+    const android = await loadPlatformReport({
+      platform: "android",
+      path: blobScreenshotReportPath,
+    });
+
+    const comment = renderQaReportComment([android]);
+
+    assert.match(
+      comment,
+      /\[screenshots\/android\/onboarding\.png\]\(https:\/\/example\.public\.blob\.vercel-storage\.com\/screenshots\/android\/onboarding\.png\)/,
+    );
+    assert.match(comment, /Android onboarding state/);
   });
 
   it("requires complete GitHub target options before upserting", () => {

@@ -14,6 +14,14 @@ function runCli(args) {
   });
 }
 
+function runCliWithEnv(args, env) {
+  return spawnSync(process.execPath, [cliPath, ...args], {
+    cwd: path.resolve(testDir, "../../.."),
+    encoding: "utf8",
+    env: { ...process.env, ...env },
+  });
+}
+
 describe("qa-agent doctor", () => {
   it("reports success for a minimal valid config", () => {
     const result = runCli([
@@ -26,7 +34,64 @@ describe("qa-agent doctor", () => {
     assert.match(result.stdout, /QA Agent doctor passed/);
     assert.match(result.stdout, /App adapter: expo-eas/);
     assert.match(result.stdout, /Target platforms: android/);
+    assert.match(result.stdout, /Screenshot storage: artifact/);
     assert.equal(result.stderr, "");
+  });
+
+  it("defaults screenshot storage to artifact without third-party credentials", () => {
+    const result = runCli([
+      "doctor",
+      "--project",
+      path.join(testDir, "fixtures/default-artifact-storage"),
+    ]);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /QA Agent doctor passed/);
+    assert.match(result.stdout, /Screenshot storage: artifact/);
+    assert.equal(result.stderr, "");
+  });
+
+  it("accepts Vercel Blob storage when the configured credential exists", () => {
+    const result = runCliWithEnv(
+      [
+        "doctor",
+        "--project",
+        path.join(testDir, "fixtures/vercel-blob-storage"),
+      ],
+      { QA_AGENT_BLOB_TOKEN: "blob-token" },
+    );
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Screenshot storage: vercel-blob/);
+    assert.equal(result.stderr, "");
+  });
+
+  it("reports a clear doctor failure when Vercel Blob credentials are missing", () => {
+    const result = runCliWithEnv(
+      [
+        "doctor",
+        "--project",
+        path.join(testDir, "fixtures/vercel-blob-storage"),
+      ],
+      { QA_AGENT_BLOB_TOKEN: "" },
+    );
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /environment issue/);
+    assert.match(result.stderr, /Vercel Blob storage requires QA_AGENT_BLOB_TOKEN/);
+  });
+
+  it("reports invalid Vercel Blob storage configuration", () => {
+    const result = runCli([
+      "doctor",
+      "--project",
+      path.join(testDir, "fixtures/invalid-blob-storage"),
+    ]);
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /configuration issue/);
+    assert.match(result.stderr, /screenshotStorage\.tokenEnv/);
   });
 
   it("reports a clear failure for missing model configuration", () => {

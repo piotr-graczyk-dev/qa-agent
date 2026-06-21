@@ -14,8 +14,4 @@ export default defineQaAgentConfig({
       applicationId: "com.example.qaagent",
     },
   },
-  screenshotStorage: {
-    provider: "artifact",
-    artifactsDir: "qa-agent/screenshots",
-  },
 });

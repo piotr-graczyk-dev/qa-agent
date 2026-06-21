@@ -213,8 +213,23 @@ function renderScreenshots(screenshots: QaReport["screenshots"]): string[] {
 
   return screenshots.map((screenshot) => {
     const caption = screenshot.caption ? ` - ${screenshot.caption}` : "";
-    return `- ${screenshot.path}${caption}`;
+    const location = renderScreenshotLocation(screenshot);
+    return `- ${location}${caption}`;
   });
+}
+
+function renderScreenshotLocation(
+  screenshot: QaReport["screenshots"][number],
+): string {
+  if (screenshot.storage?.provider === "vercel-blob") {
+    return `[${screenshot.path}](${screenshot.storage.url})`;
+  }
+
+  if (screenshot.storage?.provider === "artifact") {
+    return screenshot.storage.artifactPath ?? screenshot.path;
+  }
+
+  return screenshot.path;
 }
 
 function formatPlatform(platform: PlatformReport["platform"]): string {

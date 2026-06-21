@@ -34,10 +34,30 @@ export const qaReportIssueSchema = z
   })
   .strict();
 
+export const qaReportScreenshotStorageSchema = z.discriminatedUnion("provider", [
+  z
+    .object({
+      provider: z.literal("artifact"),
+      artifactPath: z
+        .string()
+        .trim()
+        .min(1, "screenshot artifactPath is required")
+        .optional(),
+    })
+    .strict(),
+  z
+    .object({
+      provider: z.literal("vercel-blob"),
+      url: z.string().trim().url("screenshot url must be a valid URL"),
+    })
+    .strict(),
+]);
+
 export const qaReportScreenshotSchema = z
   .object({
     path: z.string().trim().min(1, "screenshot path is required"),
     caption: z.string().trim().min(1, "screenshot caption is required").optional(),
+    storage: qaReportScreenshotStorageSchema.optional(),
   })
   .strict();
 
@@ -57,6 +77,9 @@ export const qaReportSchema = z
 export type QaStatus = z.infer<typeof qaStatusSchema>;
 export type PrContext = z.infer<typeof prContextSchema>;
 export type PrContextInput = z.input<typeof prContextSchema>;
+export type QaReportScreenshotStorage = z.infer<
+  typeof qaReportScreenshotStorageSchema
+>;
 export type QaReport = z.infer<typeof qaReportSchema>;
 export type QaReportInput = z.input<typeof qaReportSchema>;
 

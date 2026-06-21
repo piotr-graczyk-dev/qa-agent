@@ -42,6 +42,10 @@ export default defineQaAgentConfig({
       applicationId: "TODO_ANDROID_APPLICATION_ID",
     },
   },
+  screenshotStorage: {
+    provider: "artifact",
+    artifactsDir: "qa-agent/screenshots",
+  },
 });
 `,
   },

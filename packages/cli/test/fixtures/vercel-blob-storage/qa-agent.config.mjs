@@ -15,7 +15,7 @@ export default defineQaAgentConfig({
     },
   },
   screenshotStorage: {
-    provider: "artifact",
-    artifactsDir: "qa-agent/screenshots",
+    provider: "vercel-blob",
+    tokenEnv: "QA_AGENT_BLOB_TOKEN",
   },
 });
