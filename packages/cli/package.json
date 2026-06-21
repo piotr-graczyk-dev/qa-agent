@@ -1,0 +1,33 @@
+{
+  "name": "qa-agent",
+  "version": "0.0.0",
+  "type": "module",
+  "bin": {
+    "qa-agent": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "pretest": "npm run build",
+    "test": "node --test test",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.x",
+    "typescript": "7.0.1-rc"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

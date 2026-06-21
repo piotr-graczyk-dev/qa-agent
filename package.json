@@ -1,7 +1,11 @@
 {
-  "name": "qa-agent",
+  "name": "qa-agent-workspace",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "imports": {
     "#*": "./agent/*",
     "#evals/*": "./evals/*"
@@ -9,8 +13,10 @@
   "scripts": {
     "build": "eve build",
     "dev": "eve dev",
+    "pretest": "npm run build --workspace qa-agent",
     "start": "eve start",
-    "typecheck": "tsc"
+    "test": "node --test packages/cli/test",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@vercel/connect": "0.2.2",
