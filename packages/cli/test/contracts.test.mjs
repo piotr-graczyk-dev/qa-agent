@@ -68,12 +68,16 @@ describe("QA Report contract", () => {
   it("converts an invalid report into a blocked report with diagnostics", () => {
     const report = qaReportOrBlocked(
       { ...validReport, status: "skipped" },
-      ["write_report returned an invalid payload."],
+      ["", "  ", " write_report returned an invalid payload. "],
     );
 
     assert.equal(report.status, "blocked");
     assert.equal(report.checksPerformed.length, 0);
-    assert.match(report.diagnostics.join("\n"), /invalid payload/);
+    assert.ok(report.diagnostics.every((diagnostic) => diagnostic.trim()));
+    assert.equal(
+      report.diagnostics[0],
+      "write_report returned an invalid payload.",
+    );
     assert.match(report.diagnostics.join("\n"), /status/);
   });
 

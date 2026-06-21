@@ -102,8 +102,12 @@ export function qaReportOrBlocked(
     checksPerformed: [],
     issuesFound: [],
     screenshots: [],
-    diagnostics: [...diagnostics, ...validationDiagnostics],
+    diagnostics: [...sanitizeDiagnostics(diagnostics), ...validationDiagnostics],
   };
+}
+
+function sanitizeDiagnostics(diagnostics: string[]): string[] {
+  return diagnostics.map((diagnostic) => diagnostic.trim()).filter(Boolean);
 }
 
 function formatZodIssues(issues: z.core.$ZodIssue[]): string[] {
