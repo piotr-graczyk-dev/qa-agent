@@ -196,6 +196,20 @@ describe("qa-agent run", () => {
     });
   }
 
+  it("rejects allowed runtime actions as fixture requested actions", () => {
+    const result = runCli(["run-local", "--mock-requested-action", "inspect_ui"]);
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /--mock-requested-action must be one of:/);
+    assert.match(result.stderr, /build_app/);
+    assert.match(result.stderr, /install_app/);
+    assert.match(result.stderr, /provision_device/);
+    assert.match(result.stderr, /launch_app/);
+    assert.doesNotMatch(result.stderr, /login_with_profile/);
+    assert.doesNotMatch(result.stderr, /take_screenshot/);
+  });
+
   it("turns an invalid write_report result into a blocked report with diagnostics", () => {
     const outDir = createOutDir();
     const result = runCli([

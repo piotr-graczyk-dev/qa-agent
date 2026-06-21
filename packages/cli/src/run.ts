@@ -30,23 +30,24 @@ type SuccessfulMobileDeviceToolResult = Extract<
   { ok: true }
 >;
 
-export const RUNTIME_ACTION_NAMES = [
-  "login_with_profile",
-  "inspect_ui",
-  "take_screenshot",
+export const MOCKABLE_RUNTIME_ACTION_NAMES = [
   "build_app",
   "install_app",
   "provision_device",
   "launch_app",
 ] as const;
 
-export type RuntimeActionName = (typeof RUNTIME_ACTION_NAMES)[number];
+export type MockableRuntimeActionName =
+  (typeof MOCKABLE_RUNTIME_ACTION_NAMES)[number];
+
+type RuntimeActionName =
+  | "login_with_profile"
+  | "inspect_ui"
+  | "take_screenshot"
+  | MockableRuntimeActionName;
 
 const LOCAL_MODE_RESTRICTED_ACTIONS = new Set<RuntimeActionName>([
-  "build_app",
-  "install_app",
-  "provision_device",
-  "launch_app",
+  ...MOCKABLE_RUNTIME_ACTION_NAMES,
 ]);
 
 export type RunOptions = {
@@ -57,7 +58,7 @@ export type RunOptions = {
   prContextPath: string;
   mockReportPath?: string;
   mockDeviceDriver?: boolean;
-  mockRequestedAction?: RuntimeActionName;
+  mockRequestedAction?: MockableRuntimeActionName;
 };
 
 export type RunMode = "ci" | "local";
@@ -183,7 +184,7 @@ function createFixtureEveRuntime(
   authTools: AuthRuntimeTools,
   authProfileName: string | undefined,
   mockReportPath: string | undefined,
-  mockRequestedAction: RuntimeActionName | undefined,
+  mockRequestedAction: MockableRuntimeActionName | undefined,
   redactor: SecretRedactor,
 ): EveSessionRuntime {
   return {
@@ -356,7 +357,7 @@ function* blockedActionEvents(
 }
 
 function mockActionResult(
-  action: RuntimeActionName,
+  action: MockableRuntimeActionName,
   result: SuccessfulMobileDeviceToolResult["result"],
 ): SuccessfulMobileDeviceToolResult {
   return {

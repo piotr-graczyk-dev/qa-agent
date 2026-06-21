@@ -11,9 +11,9 @@ import {
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
 import {
-  RUNTIME_ACTION_NAMES,
+  MOCKABLE_RUNTIME_ACTION_NAMES,
   runQaAgent,
-  type RuntimeActionName,
+  type MockableRuntimeActionName,
 } from "./run.js";
 
 type ParsedCli = {
@@ -22,7 +22,7 @@ type ParsedCli = {
   configPath?: string;
   mockReportPath?: string;
   mockDeviceDriver: boolean;
-  mockRequestedAction?: RuntimeActionName;
+  mockRequestedAction?: MockableRuntimeActionName;
   outDir?: string;
   platform?: "android" | "ios";
   prContextPath?: string;
@@ -178,10 +178,10 @@ function parseArgs(argv: string[]): ParsedCli {
 
     if (arg === "--mock-requested-action") {
       const action = requireValue(argv, index, arg);
-      if (isRuntimeActionName(action)) {
+      if (isMockableRuntimeActionName(action)) {
         parsed.mockRequestedAction = action;
       } else {
-        parsed.error = `${arg} must be one of: ${RUNTIME_ACTION_NAMES.join(", ")}`;
+        parsed.error = `${arg} must be one of: ${MOCKABLE_RUNTIME_ACTION_NAMES.join(", ")}`;
       }
       index += 1;
       continue;
@@ -352,8 +352,12 @@ function parsePositiveInteger(value: string, flag: string): number {
   return parsed;
 }
 
-function isRuntimeActionName(value: string): value is RuntimeActionName {
-  return RUNTIME_ACTION_NAMES.includes(value as RuntimeActionName);
+function isMockableRuntimeActionName(
+  value: string,
+): value is MockableRuntimeActionName {
+  return MOCKABLE_RUNTIME_ACTION_NAMES.includes(
+    value as MockableRuntimeActionName,
+  );
 }
 
 function printHelp(
