@@ -4,11 +4,16 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
+import { runQaAgent } from "./run.js";
 
 type ParsedCli = {
   command?: string;
   projectDir: string;
   configPath?: string;
+  mockReportPath?: string;
+  outDir?: string;
+  platform?: "android" | "ios";
+  prContextPath?: string;
   help: boolean;
 };
 
@@ -28,7 +33,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
         ? "doctor"
         : parsed.command === "init"
           ? "init"
-          : "root",
+          : parsed.command === "run"
+            ? "run"
+            : "root",
     );
     return 0;
   }
@@ -41,6 +48,38 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     return 0;
+  }
+
+  if (parsed.command === "run") {
+    const configPath = resolveConfigPath(parsed);
+    if (!existsSync(configPath)) {
+      console.error(`QA Agent Config not found: ${configPath}`);
+      return 1;
+    }
+
+    if (!parsed.prContextPath) {
+      console.error("qa-agent run requires --pr-context <path>");
+      return 1;
+    }
+
+    const result = await runQaAgent({
+      configPath,
+      mockReportPath: parsed.mockReportPath
+        ? resolveProjectPath(parsed.projectDir, parsed.mockReportPath)
+        : undefined,
+      outDir: resolveProjectPath(
+        parsed.projectDir,
+        parsed.outDir ?? "artifacts/qa-agent",
+      ),
+      platform: parsed.platform ?? "android",
+      prContextPath: resolveProjectPath(parsed.projectDir, parsed.prContextPath),
+    });
+    const output = result.ok ? console.log : console.error;
+    for (const message of result.messages) {
+      output(message);
+    }
+
+    return result.ok ? 0 : 1;
   }
 
   if (parsed.command !== "doctor") {
@@ -91,6 +130,30 @@ function parseArgs(argv: string[]): ParsedCli {
       continue;
     }
 
+    if (arg === "--mock-report") {
+      parsed.mockReportPath = requireValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--out") {
+      parsed.outDir = requireValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--platform") {
+      parsed.platform = parsePlatform(requireValue(argv, index, arg));
+      index += 1;
+      continue;
+    }
+
+    if (arg === "--pr-context") {
+      parsed.prContextPath = requireValue(argv, index, arg);
+      index += 1;
+      continue;
+    }
+
     if (!parsed.command) {
       parsed.command = arg;
       continue;
@@ -125,6 +188,12 @@ function resolveConfigPath(parsed: ParsedCli): string {
   return path.join(projectDir, DEFAULT_CONFIG_FILES[0]);
 }
 
+function resolveProjectPath(projectDir: string, filePath: string): string {
+  return path.isAbsolute(filePath)
+    ? filePath
+    : path.join(path.resolve(projectDir), filePath);
+}
+
 function requireValue(argv: string[], index: number, flag: string): string {
   const value = argv[index + 1];
   if (!value) {
@@ -133,7 +202,15 @@ function requireValue(argv: string[], index: number, flag: string): string {
   return value;
 }
 
-function printHelp(scope: "root" | "init" | "doctor"): void {
+function parsePlatform(value: string): "android" | "ios" {
+  if (value === "android" || value === "ios") {
+    return value;
+  }
+
+  throw new Error(`--platform must be "android" or "ios", received "${value}"`);
+}
+
+function printHelp(scope: "root" | "init" | "doctor" | "run"): void {
   if (scope === "init") {
     console.log(`Usage: qa-agent init [--project <dir>]
 
@@ -162,14 +239,34 @@ TypeScript config files require a Node loader that can import TypeScript.`);
     return;
   }
 
+  if (scope === "run") {
+    console.log(`Usage: qa-agent run [--project <dir>] [--config <path>] --pr-context <path> [--platform <android|ios>] [--out <dir>]
+
+Run a QA Agent session against PR Context and a mocked Mobile Device Driver.
+
+Options:
+  --project <dir>      Project directory containing QA Agent config and artifacts
+  --config <path>      Config path, relative to --project unless absolute
+  --pr-context <path>  PR Context JSON path, relative to --project unless absolute
+  --platform <target>  Target platform, android by default
+  --out <dir>          Artifact directory, defaults to artifacts/qa-agent
+  --mock-report <path> Fixture-only write_report payload path
+  -h, --help           Show this help message
+
+The command writes exactly one validated QA Report artifact named qa-report.json.`);
+    return;
+  }
+
   console.log(`Usage: qa-agent <command>
 
 Commands:
   init     Scaffold Android-first Expo/EAS QA Agent files
   doctor   Validate QA Agent Config
+  run      Run a mocked QA Run through the Eve session contract
 
 Run "qa-agent init --help" for command options.
-Run "qa-agent doctor --help" for command options.`);
+Run "qa-agent doctor --help" for command options.
+Run "qa-agent run --help" for command options.`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
