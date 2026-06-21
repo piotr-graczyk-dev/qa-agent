@@ -30,14 +30,38 @@ type SuccessfulMobileDeviceToolResult = Extract<
   { ok: true }
 >;
 
+export const MOCKABLE_RUNTIME_ACTION_NAMES = [
+  "build_app",
+  "install_app",
+  "provision_device",
+  "launch_app",
+] as const;
+
+export type MockableRuntimeActionName =
+  (typeof MOCKABLE_RUNTIME_ACTION_NAMES)[number];
+
+type RuntimeActionName =
+  | "login_with_profile"
+  | "inspect_ui"
+  | "take_screenshot"
+  | MockableRuntimeActionName;
+
+const LOCAL_MODE_RESTRICTED_ACTIONS = new Set<RuntimeActionName>([
+  ...MOCKABLE_RUNTIME_ACTION_NAMES,
+]);
+
 export type RunOptions = {
   configPath: string;
+  mode?: RunMode;
   outDir: string;
   platform: TargetPlatform;
   prContextPath: string;
   mockReportPath?: string;
   mockDeviceDriver?: boolean;
+  mockRequestedAction?: MockableRuntimeActionName;
 };
+
+export type RunMode = "ci" | "local";
 
 export type RunResult =
   | { ok: true; report: QaReport; reportPath: string; messages: string[] }
@@ -49,12 +73,14 @@ type EveSessionRuntime = {
 
 type EveSessionInput = {
   message: string;
+  mode: RunMode;
   prContext: PrContext;
   platform: TargetPlatform;
   outDir: string;
 };
 
 export async function runQaAgent(options: RunOptions): Promise<RunResult> {
+  const mode = options.mode ?? "ci";
   const configResult = await loadQaAgentConfig(options.configPath);
   if (!configResult.ok) {
     return {
@@ -114,12 +140,14 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
     }),
     authProfileName,
     options.mockReportPath,
+    options.mockRequestedAction,
     redactor,
   );
   const report = await collectReportFromEveSession(
     runtime,
     {
-      message: buildRunMessage(prContextResult.value, options.platform),
+      message: buildRunMessage(prContextResult.value, options.platform, mode),
+      mode,
       prContext: prContextResult.value,
       platform: options.platform,
       outDir: options.outDir,
@@ -136,7 +164,14 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
     report,
     reportPath,
     messages: [
-      "QA Agent run completed.",
+      mode === "local"
+        ? "QA Agent local debug run completed."
+        : "QA Agent run completed.",
+      ...(mode === "local"
+        ? [
+            "Local debug mode assumes the app and device are already running; it does not build, install, provision, or launch them.",
+          ]
+        : []),
       `- Platform: ${options.platform}`,
       `- Status: ${report.status}`,
       `- QA Report: ${reportPath}`,
@@ -149,6 +184,7 @@ function createFixtureEveRuntime(
   authTools: AuthRuntimeTools,
   authProfileName: string | undefined,
   mockReportPath: string | undefined,
+  mockRequestedAction: MockableRuntimeActionName | undefined,
   redactor: SecretRedactor,
 ): EveSessionRuntime {
   return {
@@ -157,8 +193,32 @@ function createFixtureEveRuntime(
       yield eveEvent("turn.started", { platform: input.platform });
       yield eveEvent("message.received", { message: input.message });
 
+      if (mockRequestedAction) {
+        const blocked = localModeActionBlock(input.mode, mockRequestedAction);
+        if (blocked) {
+          yield* blockedActionEvents(mockRequestedAction, blocked);
+          return;
+        }
+
+        yield eveEvent("action.result", {
+          name: mockRequestedAction,
+          status: "completed",
+          result: mockActionResult(mockRequestedAction, {
+            command: `mock ${mockRequestedAction}`,
+            stdout: "{}",
+            stderr: "",
+          }),
+        });
+      }
+
       let login: LoginWithProfileResult | undefined;
       if (authProfileName) {
+        const blocked = localModeActionBlock(input.mode, "login_with_profile");
+        if (blocked) {
+          yield* blockedActionEvents("login_with_profile", blocked);
+          return;
+        }
+
         login = await authTools.loginWithProfile({ profileName: authProfileName });
         yield eveEvent("action.result", {
           name: "login_with_profile",
@@ -178,6 +238,12 @@ function createFixtureEveRuntime(
         }
       }
 
+      const inspectBlocked = localModeActionBlock(input.mode, "inspect_ui");
+      if (inspectBlocked) {
+        yield* blockedActionEvents("inspect_ui", inspectBlocked);
+        return;
+      }
+
       const screen = await tools.inspectUi({ interactiveOnly: true });
       yield eveEvent("action.result", {
         name: "inspect_ui",
@@ -190,6 +256,12 @@ function createFixtureEveRuntime(
         yield eveEvent("session.completed", {
           sessionId: "qa-agent-fixture-session",
         });
+        return;
+      }
+
+      const screenshotBlocked = localModeActionBlock(input.mode, "take_screenshot");
+      if (screenshotBlocked) {
+        yield* blockedActionEvents("take_screenshot", screenshotBlocked);
         return;
       }
 
@@ -233,6 +305,66 @@ function createFixtureEveRuntime(
       yield eveEvent("turn.completed", { finishReason: "stop" });
       yield eveEvent("session.completed", { sessionId: "qa-agent-fixture-session" });
     },
+  };
+}
+
+type LocalModeActionBlock = {
+  ok: false;
+  action: RuntimeActionName;
+  blocked: true;
+  reason: string;
+  diagnostics: string[];
+};
+
+function localModeActionBlock(
+  mode: RunMode,
+  action: RuntimeActionName,
+): LocalModeActionBlock | undefined {
+  if (mode !== "local" || !LOCAL_MODE_RESTRICTED_ACTIONS.has(action)) {
+    return undefined;
+  }
+
+  const reason = `Local debug mode cannot run ${action}; the app and device must already be running.`;
+  return {
+    ok: false,
+    action,
+    blocked: true,
+    reason,
+    diagnostics: [
+      reason,
+      "Use qa-agent run in CI after provisioning, installation, and launch have already been handled by the EAS workflow.",
+    ],
+  };
+}
+
+function* blockedActionEvents(
+  action: RuntimeActionName,
+  blocked: LocalModeActionBlock,
+): Iterable<HandleMessageStreamEvent> {
+  yield eveEvent("action.result", {
+    name: action,
+    status: "failed",
+    result: blocked,
+  });
+  yield eveEvent("turn.failed", {
+    message: blocked.reason,
+    diagnostics: blocked.diagnostics,
+  });
+  yield eveEvent("turn.completed", { finishReason: "tool_blocked" });
+  yield eveEvent("session.completed", {
+    sessionId: "qa-agent-fixture-session",
+  });
+}
+
+function mockActionResult(
+  action: MockableRuntimeActionName,
+  result: SuccessfulMobileDeviceToolResult["result"],
+): SuccessfulMobileDeviceToolResult {
+  return {
+    ok: true,
+    action,
+    intent: action,
+    result,
   };
 }
 
@@ -324,7 +456,7 @@ function defaultMockReport(
 
   return {
     status: "passed",
-    summary: `Mocked ${input.platform} QA Run completed for PR #${input.prContext.pullRequestNumber}.`,
+    summary: `Mocked ${input.platform} ${input.mode === "local" ? "local debug " : ""}QA Run completed for PR #${input.prContext.pullRequestNumber}.`,
     checksPerformed,
     issuesFound: [],
     screenshots: [
@@ -366,9 +498,15 @@ function toolFailureEvent(
   });
 }
 
-function buildRunMessage(prContext: PrContext, platform: TargetPlatform): string {
+function buildRunMessage(
+  prContext: PrContext,
+  platform: TargetPlatform,
+  mode: RunMode,
+): string {
   return [
-    `Run a black-box QA pass for ${platform}.`,
+    mode === "local"
+      ? `Run a local black-box QA debug pass for ${platform}. The app and device are already running; do not build, install, provision, or launch them.`
+      : `Run a black-box QA pass for ${platform}.`,
     `Repository: ${prContext.repository}`,
     `Pull request: #${prContext.pullRequestNumber} ${prContext.title}`,
     "Finish by calling write_report exactly once.",
