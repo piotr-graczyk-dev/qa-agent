@@ -1,0 +1,21 @@
+{
+  "expo": {
+    "name": "QA Agent Expo Basic",
+    "slug": "qa-agent-expo-basic",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "qaagentexample",
+    "userInterfaceStyle": "light",
+    "android": {
+      "package": "dev.piotrgraczyk.qaagent.example"
+    },
+    "ios": {
+      "bundleIdentifier": "dev.piotrgraczyk.qaagent.example"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "00000000-0000-0000-0000-000000000016"
+      }
+    }
+  }
+}

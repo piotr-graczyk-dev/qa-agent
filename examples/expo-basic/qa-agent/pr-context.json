@@ -1,0 +1,16 @@
+{
+  "provider": "github",
+  "repository": "piotr-graczyk-dev/qa-agent",
+  "pullRequestNumber": 16,
+  "title": "Dogfood QA Agent Expo Basic example",
+  "body": "Fixture PR Context for running QA Agent against the Expo dogfood example.",
+  "labels": ["dogfood", "expo"],
+  "branchRefs": {
+    "base": "main",
+    "head": "example/dogfood"
+  },
+  "changedFilePaths": [
+    "examples/expo-basic/App.js",
+    "examples/expo-basic/qa-agent.config.mjs"
+  ]
+}

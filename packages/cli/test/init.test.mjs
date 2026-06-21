@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { cp, mkdtemp, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, it } from "node:test";
@@ -152,6 +152,32 @@ describe("qa-agent init", () => {
     assert.equal(
       await readFile(path.join(projectDir, "qa-agent.config.mjs"), "utf8"),
       existingConfig,
+    );
+  });
+
+  it("can run against the Expo dogfood example without overwriting it", async () => {
+    const projectDir = await mkdtemp(path.join(tmpdir(), "qa-agent-example-"));
+    const exampleDir = path.resolve(testDir, "../../../examples/expo-basic");
+    await cp(exampleDir, projectDir, {
+      recursive: true,
+      filter: (source) => !source.includes(`${path.sep}node_modules${path.sep}`),
+    });
+    const configBefore = await readFile(
+      path.join(projectDir, "qa-agent.config.mjs"),
+      "utf8",
+    );
+
+    const result = runCli(["init", "--project", projectDir]);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /QA Agent init completed/);
+    assert.match(result.stdout, /skipped: .*qa-agent\.config\.mjs/);
+    assert.match(result.stdout, /skipped: .*qa-agent-android\.yml/);
+    assert.match(result.stdout, /skipped: .*provision-tooling\.sh/);
+    assert.equal(result.stderr, "");
+    assert.equal(
+      await readFile(path.join(projectDir, "qa-agent.config.mjs"), "utf8"),
+      configBefore,
     );
   });
 

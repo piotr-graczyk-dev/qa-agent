@@ -1,0 +1,20 @@
+{
+  "name": "qa-agent-expo-basic",
+  "version": "0.0.0",
+  "private": true,
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "qa-agent:doctor": "qa-agent doctor --project ."
+  },
+  "dependencies": {
+    "expo": "^54.0.0",
+    "react": "19.1.0",
+    "react-native": "0.81.4"
+  },
+  "devDependencies": {
+    "qa-agent": "file:../../packages/cli"
+  }
+}
