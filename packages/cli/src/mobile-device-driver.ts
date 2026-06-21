@@ -77,6 +77,7 @@ type CommandRunner = (
 ) => Promise<{ stdout: string; stderr: string }>;
 
 const AGENT_DEVICE_COMMAND_TIMEOUT_MS = 120_000;
+const AGENT_DEVICE_COMMAND_KILL_GRACE_MS = 5_000;
 
 export function checkAgentDeviceAvailability(): AgentDeviceAvailability {
   const result = spawnSync("agent-device", ["--version"], {
@@ -297,30 +298,38 @@ function runAgentDeviceCommand(
     const child = spawn(file, args, {
       cwd: process.cwd(),
       env: process.env,
-      signal: timeoutSignal,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const rejectWithTimeout = () => {
-      if (settled) {
+    let timedOut = false;
+    let killTimer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutMessage = `${file} ${args.join(" ")} timed out after ${AGENT_DEVICE_COMMAND_TIMEOUT_MS}ms`;
+    const handleTimeout = () => {
+      if (settled || timedOut) {
         return;
       }
 
-      settled = true;
-      if (!child.killed) {
+      timedOut = true;
+      if (child.exitCode === null) {
         child.kill("SIGTERM");
       }
-      reject(
-        new Error(
-          `${file} ${args.join(" ")} timed out after ${AGENT_DEVICE_COMMAND_TIMEOUT_MS}ms`,
-        ),
-      );
+      killTimer = setTimeout(() => {
+        if (!settled && child.exitCode === null) {
+          child.kill("SIGKILL");
+        }
+      }, AGENT_DEVICE_COMMAND_KILL_GRACE_MS);
+    };
+    const cleanup = () => {
+      timeoutSignal.removeEventListener("abort", handleTimeout);
+      if (killTimer) {
+        clearTimeout(killTimer);
+      }
     };
 
-    timeoutSignal.addEventListener("abort", rejectWithTimeout, { once: true });
+    timeoutSignal.addEventListener("abort", handleTimeout, { once: true });
     child.stdout.setEncoding("utf8");
     child.stderr.setEncoding("utf8");
     child.stdout.on("data", (chunk) => {
@@ -330,22 +339,32 @@ function runAgentDeviceCommand(
       stderr += chunk;
     });
     child.on("error", (error) => {
-      if (timeoutSignal.aborted) {
-        rejectWithTimeout();
+      if (timedOut) {
         return;
       }
 
       if (!settled) {
         settled = true;
+        cleanup();
         reject(error);
       }
     });
-    child.on("close", (code) => {
+    child.on("close", (code, signal) => {
       if (settled) {
         return;
       }
 
       settled = true;
+      cleanup();
+      if (timedOut) {
+        reject(
+          new Error(
+            `${timeoutMessage}; process exited with signal ${signal ?? "none"}`,
+          ),
+        );
+        return;
+      }
+
       if (code === 0) {
         resolve({ stdout, stderr });
         return;
