@@ -75,7 +75,7 @@ export async function upsertQaReportComment(
 ): Promise<UpsertQaReportCommentResult> {
   const existingComments = await client.listComments();
   const existingComment = existingComments.find((comment) =>
-    comment.body?.includes(marker),
+    hasDedicatedMarkerLine(comment.body, marker),
   );
 
   if (existingComment) {
@@ -92,11 +92,11 @@ export function createGitHubCommentClient(input: {
   pullRequestNumber: number;
   token: string;
 }): GitHubCommentClient {
-  const [owner, repo] = input.repository.split("/");
-  if (!owner || !repo) {
+  if (!/^[^/\s]+\/[^/\s]+$/.test(input.repository)) {
     throw new Error("GitHub repository must use owner/name format.");
   }
 
+  const [owner, repo] = input.repository.split("/");
   const headers = {
     accept: "application/vnd.github+json",
     authorization: `Bearer ${input.token}`,
@@ -107,11 +107,17 @@ export function createGitHubCommentClient(input: {
 
   return {
     async listComments() {
-      const response = await fetch(
-        `${baseUrl}/issues/${input.pullRequestNumber}/comments`,
-        { headers },
-      );
-      return await parseGitHubResponse<GitHubComment[]>(response);
+      const comments: GitHubComment[] = [];
+      let nextUrl: string | undefined =
+        `${baseUrl}/issues/${input.pullRequestNumber}/comments?per_page=100`;
+
+      while (nextUrl) {
+        const response = await fetch(nextUrl, { headers });
+        comments.push(...(await parseGitHubResponse<GitHubComment[]>(response)));
+        nextUrl = parseNextLink(response.headers.get("link"));
+      }
+
+      return comments;
     },
     async createComment(body) {
       const response = await fetch(
@@ -133,6 +139,18 @@ export function createGitHubCommentClient(input: {
       return await parseGitHubResponse<GitHubComment>(response);
     },
   };
+}
+
+function hasDedicatedMarkerLine(
+  body: string | null | undefined,
+  marker: string,
+): boolean {
+  const firstNonEmptyLine = body
+    ?.split(/\r?\n/)
+    .map((line) => line.trim())
+    .find(Boolean);
+
+  return firstNonEmptyLine === marker;
 }
 
 function renderPlatformStatus(reports: PlatformReport[]): string {
@@ -220,4 +238,19 @@ async function parseGitHubResponse<T>(response: Response): Promise<T> {
   }
 
   return JSON.parse(body) as T;
+}
+
+function parseNextLink(linkHeader: string | null): string | undefined {
+  if (!linkHeader) {
+    return undefined;
+  }
+
+  for (const link of linkHeader.split(",")) {
+    const match = link.match(/^\s*<([^>]+)>;\s*rel="([^"]+)"\s*$/);
+    if (match?.[2] === "next") {
+      return match[1];
+    }
+  }
+
+  return undefined;
 }
