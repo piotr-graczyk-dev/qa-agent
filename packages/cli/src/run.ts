@@ -32,12 +32,15 @@ type SuccessfulMobileDeviceToolResult = Extract<
 
 export type RunOptions = {
   configPath: string;
+  mode?: RunMode;
   outDir: string;
   platform: TargetPlatform;
   prContextPath: string;
   mockReportPath?: string;
   mockDeviceDriver?: boolean;
 };
+
+export type RunMode = "ci" | "local";
 
 export type RunResult =
   | { ok: true; report: QaReport; reportPath: string; messages: string[] }
@@ -49,12 +52,14 @@ type EveSessionRuntime = {
 
 type EveSessionInput = {
   message: string;
+  mode: RunMode;
   prContext: PrContext;
   platform: TargetPlatform;
   outDir: string;
 };
 
 export async function runQaAgent(options: RunOptions): Promise<RunResult> {
+  const mode = options.mode ?? "ci";
   const configResult = await loadQaAgentConfig(options.configPath);
   if (!configResult.ok) {
     return {
@@ -119,7 +124,8 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
   const report = await collectReportFromEveSession(
     runtime,
     {
-      message: buildRunMessage(prContextResult.value, options.platform),
+      message: buildRunMessage(prContextResult.value, options.platform, mode),
+      mode,
       prContext: prContextResult.value,
       platform: options.platform,
       outDir: options.outDir,
@@ -136,7 +142,14 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
     report,
     reportPath,
     messages: [
-      "QA Agent run completed.",
+      mode === "local"
+        ? "QA Agent local debug run completed."
+        : "QA Agent run completed.",
+      ...(mode === "local"
+        ? [
+            "Local debug mode assumes the app and device are already running; it does not build, install, provision, or launch them.",
+          ]
+        : []),
       `- Platform: ${options.platform}`,
       `- Status: ${report.status}`,
       `- QA Report: ${reportPath}`,
@@ -324,7 +337,7 @@ function defaultMockReport(
 
   return {
     status: "passed",
-    summary: `Mocked ${input.platform} QA Run completed for PR #${input.prContext.pullRequestNumber}.`,
+    summary: `Mocked ${input.platform} ${input.mode === "local" ? "local debug " : ""}QA Run completed for PR #${input.prContext.pullRequestNumber}.`,
     checksPerformed,
     issuesFound: [],
     screenshots: [
@@ -366,9 +379,15 @@ function toolFailureEvent(
   });
 }
 
-function buildRunMessage(prContext: PrContext, platform: TargetPlatform): string {
+function buildRunMessage(
+  prContext: PrContext,
+  platform: TargetPlatform,
+  mode: RunMode,
+): string {
   return [
-    `Run a black-box QA pass for ${platform}.`,
+    mode === "local"
+      ? `Run a local black-box QA debug pass for ${platform}. The app and device are already running; do not build, install, provision, or launch them.`
+      : `Run a black-box QA pass for ${platform}.`,
     `Repository: ${prContext.repository}`,
     `Pull request: #${prContext.pullRequestNumber} ${prContext.title}`,
     "Finish by calling write_report exactly once.",

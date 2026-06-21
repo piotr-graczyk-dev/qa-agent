@@ -134,6 +134,34 @@ describe("qa-agent run", () => {
     assert.equal(report.screenshots.length, 1);
   });
 
+  it("executes a local debug run against a mocked already-running app/device", () => {
+    const outDir = createOutDir();
+    const result = runCli([
+      "run-local",
+      "--project",
+      projectDir,
+      "--pr-context",
+      prContextPath,
+      "--out",
+      outDir,
+      "--mock-device-driver",
+    ]);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /QA Agent local debug run completed/);
+    assert.match(result.stdout, /app and device are already running/);
+    assert.match(result.stdout, /does not build, install, provision, or launch/);
+    assert.match(result.stdout, /Status: passed/);
+    assert.equal(result.stderr, "");
+    assert.deepEqual(readdirSync(outDir), ["qa-report.json"]);
+
+    const report = readReport(outDir);
+    assert.equal(report.status, "passed");
+    assert.match(report.summary, /local debug QA Run completed/);
+    assert.deepEqual(report.issuesFound, []);
+    assert.equal(report.screenshots.length, 1);
+  });
+
   it("turns an invalid write_report result into a blocked report with diagnostics", () => {
     const outDir = createOutDir();
     const result = runCli([
@@ -287,6 +315,49 @@ describe("qa-agent run", () => {
     assert.doesNotMatch(JSON.stringify(report), /super-secret-password/);
   });
 
+  it("uses configured Auth Profiles in local debug mode without exposing secrets", () => {
+    const outDir = createOutDir();
+    const configPath = writeAuthConfig(outDir);
+    const result = spawnSync(
+      process.execPath,
+      [
+        cliPath,
+        "run-local",
+        "--project",
+        projectDir,
+        "--config",
+        configPath,
+        "--pr-context",
+        prContextPath,
+        "--out",
+        outDir,
+        "--mock-device-driver",
+      ],
+      {
+        cwd: path.resolve(testDir, "../../.."),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          QA_AGENT_LOGIN_EMAIL: "qa@example.com",
+          QA_AGENT_LOGIN_PASSWORD: "super-secret-password",
+        },
+      },
+    );
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /QA Agent local debug run completed/);
+    assert.match(result.stdout, /app and device are already running/);
+    assert.match(result.stdout, /Status: passed/);
+    assert.equal(result.stderr, "");
+
+    const report = readReport(outDir);
+    assert.equal(report.status, "passed");
+    assert.match(report.checksPerformed.join("\n"), /Auth Profile/);
+    assert.doesNotMatch(JSON.stringify(report), /qa@example\.com/);
+    assert.doesNotMatch(JSON.stringify(report), /super-secret-password/);
+    assert.doesNotMatch(result.stdout, /qa@example\.com|super-secret-password/);
+  });
+
   it("turns missing Auth Profile secrets into a blocked report with redacted diagnostics", () => {
     const outDir = createOutDir();
     const configPath = writeAuthConfig(outDir);
@@ -372,6 +443,17 @@ describe("qa-agent run", () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /Usage: qa-agent run/);
     assert.match(result.stdout, /--pr-context <path>/);
+    assert.equal(result.stderr, "");
+  });
+
+  it("prints help for the run-local command", () => {
+    const result = runCli(["run-local", "--help"]);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Usage: qa-agent run-local/);
+    assert.match(result.stdout, /--pr-context <path>/);
+    assert.match(result.stdout, /app and device are already running/);
+    assert.match(result.stdout, /does not build, install, provision, or launch/);
     assert.equal(result.stderr, "");
   });
 });

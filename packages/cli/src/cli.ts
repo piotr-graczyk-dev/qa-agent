@@ -53,9 +53,11 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
           ? "init"
           : parsed.command === "run"
             ? "run"
-            : parsed.command === "render-comment"
-              ? "render-comment"
-              : "root",
+            : parsed.command === "run-local"
+              ? "run-local"
+              : parsed.command === "render-comment"
+                ? "render-comment"
+                : "root",
     );
     return 0;
   }
@@ -70,7 +72,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     return 0;
   }
 
-  if (parsed.command === "run") {
+  if (parsed.command === "run" || parsed.command === "run-local") {
     const configPath = resolveConfigPath(parsed);
     if (!existsSync(configPath)) {
       console.error(`QA Agent Config not found: ${configPath}`);
@@ -78,12 +80,13 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     }
 
     if (!parsed.prContextPath) {
-      console.error("qa-agent run requires --pr-context <path>");
+      console.error(`qa-agent ${parsed.command} requires --pr-context <path>`);
       return 1;
     }
 
     const result = await runQaAgent({
       configPath,
+      mode: parsed.command === "run-local" ? "local" : "ci",
       mockReportPath: parsed.mockReportPath
         ? resolveProjectPath(parsed.projectDir, parsed.mockReportPath)
         : undefined,
@@ -333,7 +336,7 @@ function parsePositiveInteger(value: string, flag: string): number {
 }
 
 function printHelp(
-  scope: "root" | "init" | "doctor" | "run" | "render-comment",
+  scope: "root" | "init" | "doctor" | "run" | "run-local" | "render-comment",
 ): void {
   if (scope === "init") {
     console.log(`Usage: qa-agent init [--project <dir>]
@@ -400,17 +403,38 @@ The command writes exactly one validated QA Report artifact named qa-report.json
     return;
   }
 
+  if (scope === "run-local") {
+    console.log(`Usage: qa-agent run-local [--project <dir>] [--config <path>] --pr-context <path> [--platform <android|ios>] [--out <dir>]
+
+Run a local debug QA Agent session against PR Context and an already running app/device.
+
+Options:
+  --project <dir>      Project directory containing QA Agent config and artifacts
+  --config <path>      Config path, relative to --project unless absolute
+  --pr-context <path>  PR Context JSON path, relative to --project unless absolute
+  --platform <target>  Target platform, android by default
+  --out <dir>          Artifact directory, defaults to artifacts/qa-agent
+  --mock-report <path> Fixture-only write_report payload path
+  --mock-device-driver Use the fixture Mobile Device Driver for contract tests
+  -h, --help           Show this help message
+
+Local debug mode assumes the app and device are already running. It does not build, install, provision, or launch them. The command writes exactly one validated QA Report artifact named qa-report.json.`);
+    return;
+  }
+
   console.log(`Usage: qa-agent <command>
 
 Commands:
   init            Scaffold Android-first Expo/EAS QA Agent files
   doctor          Validate QA Agent Config
   run             Run a QA Run through the Eve session contract
+  run-local       Run a local debug QA Run against an already running app/device
   render-comment  Render or upsert the single QA Agent PR comment
 
 Run "qa-agent init --help" for command options.
 Run "qa-agent doctor --help" for command options.
 Run "qa-agent run --help" for command options.
+Run "qa-agent run-local --help" for command options.
 Run "qa-agent render-comment --help" for command options.`);
 }
 
