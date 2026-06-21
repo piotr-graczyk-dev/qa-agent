@@ -36,7 +36,7 @@ describe("Action Safety Policy", () => {
     const policy = {
       mode: "allow_project_actions",
       allowedIntents: ["reset_demo_workspace"],
-      forbiddenIntents: ["archive_demo_project"],
+      forbiddenIntents: ["archive_demo_project", "take_screenshot"],
     };
 
     assert.equal(
@@ -45,6 +45,10 @@ describe("Action Safety Policy", () => {
     );
     assert.equal(
       evaluateActionSafetyPolicy(policy, "archive_demo_project").allowed,
+      false,
+    );
+    assert.equal(
+      evaluateActionSafetyPolicy(policy, "take_screenshot").allowed,
       false,
     );
     assert.equal(evaluateActionSafetyPolicy(policy, "purchase").allowed, false);

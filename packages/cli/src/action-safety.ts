@@ -72,6 +72,17 @@ export function evaluateActionSafetyPolicy(
     };
   }
 
+  if (
+    policy.mode === "allow_project_actions" &&
+    policy.forbiddenIntents.includes(normalizedIntent)
+  ) {
+    return {
+      allowed: false,
+      intent: normalizedIntent,
+      reason: `Action intent "${normalizedIntent}" is forbidden by project policy.`,
+    };
+  }
+
   if (safeIntentSet.has(normalizedIntent)) {
     return {
       allowed: true,
@@ -85,14 +96,6 @@ export function evaluateActionSafetyPolicy(
       allowed: false,
       intent: normalizedIntent,
       reason: `Action intent "${normalizedIntent}" is not allowed by safe_only policy.`,
-    };
-  }
-
-  if (policy.forbiddenIntents.includes(normalizedIntent)) {
-    return {
-      allowed: false,
-      intent: normalizedIntent,
-      reason: `Action intent "${normalizedIntent}" is forbidden by project policy.`,
     };
   }
 

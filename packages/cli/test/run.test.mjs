@@ -29,6 +29,39 @@ function readReport(outDir) {
   return JSON.parse(readFileSync(path.join(outDir, "qa-report.json"), "utf8"));
 }
 
+function writeConfig(outDir, actionSafetyPolicy) {
+  const configPath = path.join(outDir, "qa-agent.config.mjs");
+  writeFileSync(
+    configPath,
+    `export default ${JSON.stringify(
+      {
+        targetPlatforms: ["android"],
+        model: {
+          provider: "openai",
+          modelId: "gpt-4.1",
+          apiKeyEnv: "OPENAI_API_KEY",
+        },
+        app: {
+          adapter: "expo-eas",
+          easProjectId: "00000000-0000-0000-0000-000000000000",
+          android: {
+            applicationId: "com.example.qaagent",
+          },
+        },
+        screenshotStorage: {
+          provider: "artifact",
+          artifactsDir: "qa-agent/screenshots",
+        },
+        actionSafetyPolicy,
+      },
+      null,
+      2,
+    )};\n`,
+    "utf8",
+  );
+  return configPath;
+}
+
 describe("qa-agent run", () => {
   it("executes a mocked QA Run and writes exactly one validated QA Report artifact", () => {
     const outDir = createOutDir();
@@ -136,6 +169,37 @@ describe("qa-agent run", () => {
     assert.match(report.diagnostics.join("\n"), /Expected exactly one write_report/);
     assert.match(report.diagnostics.join("\n"), /Failed to read mock write_report JSON/);
     assert.match(report.diagnostics.join("\n"), /not provided/);
+  });
+
+  it("stops before a passed report when a required mobile tool is blocked", () => {
+    const outDir = createOutDir();
+    const configPath = writeConfig(outDir, {
+      mode: "allow_project_actions",
+      allowedIntents: [],
+      forbiddenIntents: ["take_screenshot"],
+    });
+    const result = runCli([
+      "run",
+      "--project",
+      projectDir,
+      "--config",
+      configPath,
+      "--pr-context",
+      prContextPath,
+      "--out",
+      outDir,
+      "--mock-device-driver",
+    ]);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Status: blocked/);
+    assert.equal(result.stderr, "");
+
+    const report = readReport(outDir);
+    assert.equal(report.status, "blocked");
+    assert.deepEqual(report.screenshots, []);
+    assert.match(report.diagnostics.join("\n"), /take_screenshot was blocked/);
+    assert.match(report.diagnostics.join("\n"), /Expected exactly one write_report/);
   });
 
   it("reports malformed PR Context JSON without throwing", () => {

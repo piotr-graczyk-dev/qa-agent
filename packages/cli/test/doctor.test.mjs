@@ -17,7 +17,7 @@ function runCliWithoutAgentDevice(args) {
   return spawnSync(process.execPath, [cliPath, ...args], {
     cwd: path.resolve(testDir, "../../.."),
     encoding: "utf8",
-    env: { PATH: "" },
+    env: { ...process.env, PATH: "" },
   });
 }
 

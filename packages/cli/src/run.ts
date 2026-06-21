@@ -18,6 +18,11 @@ import {
   type MobileDeviceToolResult,
 } from "./mobile-device-driver.js";
 
+type SuccessfulMobileDeviceToolResult = Extract<
+  MobileDeviceToolResult,
+  { ok: true }
+>;
+
 export type RunOptions = {
   configPath: string;
   outDir: string;
@@ -132,18 +137,34 @@ function createFixtureEveRuntime(
       const screen = await tools.inspectUi({ interactiveOnly: true });
       yield eveEvent("action.result", {
         name: "inspect_ui",
-        status: "completed",
+        status: screen.ok ? "completed" : "failed",
         result: screen,
       });
+      if (!screen.ok) {
+        yield toolFailureEvent("inspect_ui", screen);
+        yield eveEvent("turn.completed", { finishReason: "tool_failed" });
+        yield eveEvent("session.completed", {
+          sessionId: "qa-agent-fixture-session",
+        });
+        return;
+      }
 
       const screenshot = await tools.takeScreenshot({
         path: buildScreenshotPath(input.outDir, input.platform),
       });
       yield eveEvent("action.result", {
         name: "take_screenshot",
-        status: "completed",
+        status: screenshot.ok ? "completed" : "failed",
         result: screenshot,
       });
+      if (!screenshot.ok) {
+        yield toolFailureEvent("take_screenshot", screenshot);
+        yield eveEvent("turn.completed", { finishReason: "tool_failed" });
+        yield eveEvent("session.completed", {
+          sessionId: "qa-agent-fixture-session",
+        });
+        return;
+      }
 
       const reportResult =
         mockReportPath === undefined
@@ -243,7 +264,7 @@ async function collectReportFromEveSession(
 
 function defaultMockReport(
   input: EveSessionInput,
-  screenshot: MobileDeviceToolResult,
+  screenshot: SuccessfulMobileDeviceToolResult,
 ): QaReport {
   return {
     status: "passed",
@@ -264,14 +285,10 @@ function defaultMockReport(
 }
 
 function readScreenshotPath(
-  screenshot: MobileDeviceToolResult,
+  screenshot: SuccessfulMobileDeviceToolResult,
   outDir: string,
   platform: TargetPlatform,
 ): string {
-  if (!screenshot.ok) {
-    return buildScreenshotPath(outDir, platform);
-  }
-
   try {
     const parsed = JSON.parse(screenshot.result.stdout) as {
       path?: unknown;
@@ -286,6 +303,15 @@ function readScreenshotPath(
   }
 
   return buildScreenshotPath(outDir, platform);
+}
+
+function toolFailureEvent(
+  name: string,
+  result: Exclude<MobileDeviceToolResult, { ok: true }>,
+): HandleMessageStreamEvent {
+  return eveEvent("turn.failed", {
+    message: `${name} was blocked by Action Safety Policy: ${result.reason}`,
+  });
 }
 
 function buildRunMessage(prContext: PrContext, platform: TargetPlatform): string {
