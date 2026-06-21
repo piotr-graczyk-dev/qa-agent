@@ -36,3 +36,4 @@ export {
 } from "./contracts.js";
 export { runDoctor, type DoctorResult } from "./doctor.js";
 export { runInit, type InitFileResult, type InitResult } from "./init.js";
+export { runQaAgent, type RunOptions, type RunResult } from "./run.js";

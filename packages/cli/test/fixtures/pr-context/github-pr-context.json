@@ -1,0 +1,16 @@
+{
+  "provider": "github",
+  "repository": "piotr-graczyk-dev/qa-agent",
+  "pullRequestNumber": 12,
+  "title": "Run a mocked QA Run through packaged Eve runtime",
+  "body": "Create a narrow end-to-end QA Run path through the packaged Eve runtime using mocked mobile tools.",
+  "labels": ["enhancement", "mobile"],
+  "branchRefs": {
+    "base": "main",
+    "head": "codex/issue-12-mocked-eve-runtime-run"
+  },
+  "changedFilePaths": [
+    "packages/cli/src/run.ts",
+    "packages/cli/test/run.test.mjs"
+  ]
+}
