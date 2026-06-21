@@ -102,6 +102,35 @@ describe("Auth Profiles", () => {
     assert.match(result.diagnostics.join("\n"), /Configure authProfiles/);
   });
 
+  it("turns OTP command failures into blocked tool results", async () => {
+    const tools = createAuthRuntimeTools({
+      profiles: {
+        otp_user: {
+          type: "otp_command",
+          commandEnv: "QA_AGENT_OTP_COMMAND",
+          otpField: 'id="otp"',
+        },
+      },
+      driver: createMockMobileDeviceDriver(),
+      policy: { mode: "safe_only" },
+      env: {
+        QA_AGENT_OTP_COMMAND: "print-otp",
+      },
+      async runOtpCommand() {
+        throw new Error("command timed out after 30000ms");
+      },
+    });
+
+    const result = await tools.loginWithProfile({ profileName: "otp_user" });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.blocked, true);
+    assert.match(result.reason, /OTP command failed/);
+    assert.match(result.diagnostics.join("\n"), /QA_AGENT_OTP_COMMAND/);
+    assert.match(result.diagnostics.join("\n"), /timed out/);
+    assert.doesNotMatch(JSON.stringify(result), /print-otp/);
+  });
+
   it("redacts known credential values and token-shaped strings recursively", () => {
     const redactor = createSecretRedactor(["super-secret-password"]);
     const result = redactJsonValue(

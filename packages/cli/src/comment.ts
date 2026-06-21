@@ -46,7 +46,7 @@ export async function loadPlatformReport(
 
   return {
     platform: input.platform,
-    report: redactQaReport(result.value),
+    report: result.value,
   };
 }
 

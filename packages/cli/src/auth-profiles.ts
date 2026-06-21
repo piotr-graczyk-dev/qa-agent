@@ -260,7 +260,20 @@ async function loginWithOtpCommand(input: {
     return command.result;
   }
 
-  const otp = (await input.runOtpCommand(command.value)).trim();
+  let otp: string;
+  try {
+    otp = (await input.runOtpCommand(command.value)).trim();
+  } catch (error) {
+    const message = formatErrorMessage(error);
+    return blocked(
+      input.profileName,
+      `OTP command failed for Auth Profile "${input.profileName}".`,
+      [
+        `Auth Profile "${input.profileName}" could not read an OTP code from ${input.profile.commandEnv}: ${message}`,
+      ],
+    );
+  }
+
   if (!otp) {
     return blocked(input.profileName, "OTP command produced no code.", [
       `Auth Profile "${input.profileName}" could not read an OTP code from ${input.profile.commandEnv}.`,
@@ -374,4 +387,8 @@ function runShellCommand(command: string): Promise<string> {
       reject(new Error(`OTP command failed with exit ${code}: ${stderr.trim()}`));
     });
   });
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
