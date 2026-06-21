@@ -86,6 +86,9 @@ describe("qa-agent init", () => {
     assert.match(config, /apiKeyEnv: "QA_AGENT_MODEL_API_KEY"/);
     assert.match(config, /adapter: "expo-eas"/);
     assert.match(config, /applicationId: "TODO_ANDROID_APPLICATION_ID"/);
+    assert.match(config, /screenshotStorage/);
+    assert.match(config, /provider: "artifact"/);
+    assert.match(config, /artifactsDir: "qa-agent\/screenshots"/);
 
     const workflow = await readFile(
       path.join(projectDir, ".eas", "workflows", "qa-agent-android.yml"),

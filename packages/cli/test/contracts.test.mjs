@@ -40,6 +40,25 @@ describe("QA Report contract", () => {
     assert.deepEqual(result.value.issuesFound, []);
   });
 
+  it("accepts screenshot storage metadata on a QA Report", () => {
+    const result = validateQaReport({
+      ...validReport,
+      screenshots: [
+        {
+          path: "screenshots/android/onboarding.png",
+          caption: "Onboarding screen",
+          storage: {
+            provider: "vercel-blob",
+            url: "https://example.public.blob.vercel-storage.com/screenshots/android/onboarding.png",
+          },
+        },
+      ],
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.value.screenshots[0].storage.provider, "vercel-blob");
+  });
+
   it("accepts every QA Status", () => {
     for (const status of ["passed", "failed", "blocked", "unsure"]) {
       const result = validateQaReport({

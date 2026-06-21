@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "summary": "The onboarding screen rendered with externally hosted screenshot evidence.",
+  "checksPerformed": [
+    "Launched the Expo preview build",
+    "Captured onboarding evidence"
+  ],
+  "issuesFound": [],
+  "screenshots": [
+    {
+      "path": "screenshots/android/onboarding.png",
+      "caption": "Android onboarding state",
+      "storage": {
+        "provider": "vercel-blob",
+        "url": "https://example.public.blob.vercel-storage.com/screenshots/android/onboarding.png"
+      }
+    }
+  ]
+}

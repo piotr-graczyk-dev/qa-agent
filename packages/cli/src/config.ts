@@ -3,6 +3,34 @@ import { z } from "zod";
 
 export const targetPlatformSchema = z.enum(["android", "ios"]);
 
+export const screenshotStorageSchema = z
+  .discriminatedUnion("provider", [
+    z
+      .object({
+        provider: z.literal("artifact"),
+        artifactsDir: z
+          .string()
+          .trim()
+          .min(1, "screenshotStorage.artifactsDir is required")
+          .default("qa-agent/screenshots"),
+      })
+      .strict(),
+    z
+      .object({
+        provider: z.literal("vercel-blob"),
+        tokenEnv: z
+          .string()
+          .trim()
+          .min(1, "screenshotStorage.tokenEnv is required")
+          .default("BLOB_READ_WRITE_TOKEN"),
+      })
+      .strict(),
+  ])
+  .default({
+    provider: "artifact",
+    artifactsDir: "qa-agent/screenshots",
+  });
+
 export const qaAgentConfigSchema = z
   .object({
     targetPlatforms: z
@@ -33,6 +61,7 @@ export const qaAgentConfigSchema = z
         })
         .optional(),
     }),
+    screenshotStorage: screenshotStorageSchema,
   })
   .superRefine((config, ctx) => {
     if (config.targetPlatforms.includes("android") && !config.app.android) {
@@ -55,6 +84,7 @@ export const qaAgentConfigSchema = z
   });
 
 export type TargetPlatform = z.infer<typeof targetPlatformSchema>;
+export type ScreenshotStorage = z.infer<typeof screenshotStorageSchema>;
 export type QaAgentConfig = z.infer<typeof qaAgentConfigSchema>;
 export type QaAgentConfigInput = z.input<typeof qaAgentConfigSchema>;
 

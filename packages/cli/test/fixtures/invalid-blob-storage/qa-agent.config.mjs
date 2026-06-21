@@ -1,6 +1,4 @@
-import { defineQaAgentConfig } from "../../../dist/index.js";
-
-export default defineQaAgentConfig({
+export default {
   targetPlatforms: ["android"],
   model: {
     provider: "openai",
@@ -15,7 +13,7 @@ export default defineQaAgentConfig({
     },
   },
   screenshotStorage: {
-    provider: "artifact",
-    artifactsDir: "qa-agent/screenshots",
+    provider: "vercel-blob",
+    tokenEnv: "",
   },
-});
+};
