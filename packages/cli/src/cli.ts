@@ -17,6 +17,7 @@ type ParsedCli = {
   projectDir: string;
   configPath?: string;
   mockReportPath?: string;
+  mockDeviceDriver: boolean;
   outDir?: string;
   platform?: "android" | "ios";
   prContextPath?: string;
@@ -92,6 +93,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
       ),
       platform: parsed.platform ?? "android",
       prContextPath: resolveProjectPath(parsed.projectDir, parsed.prContextPath),
+      mockDeviceDriver: parsed.mockDeviceDriver,
     });
     const output = result.ok ? console.log : console.error;
     for (const message of result.messages) {
@@ -130,6 +132,7 @@ function parseArgs(argv: string[]): ParsedCli {
   const parsed: ParsedCli = {
     command: argv[0],
     projectDir: process.cwd(),
+    mockDeviceDriver: false,
     help: false,
   };
 
@@ -156,6 +159,11 @@ function parseArgs(argv: string[]): ParsedCli {
     if (arg === "--mock-report") {
       parsed.mockReportPath = requireValue(argv, index, arg);
       index += 1;
+      continue;
+    }
+
+    if (arg === "--mock-device-driver") {
+      parsed.mockDeviceDriver = true;
       continue;
     }
 
@@ -376,7 +384,7 @@ TypeScript config files require a Node loader that can import TypeScript.`);
   if (scope === "run") {
     console.log(`Usage: qa-agent run [--project <dir>] [--config <path>] --pr-context <path> [--platform <android|ios>] [--out <dir>]
 
-Run a QA Agent session against PR Context and a mocked Mobile Device Driver.
+Run a QA Agent session against PR Context and the Mobile Device Driver.
 
 Options:
   --project <dir>      Project directory containing QA Agent config and artifacts
@@ -385,6 +393,7 @@ Options:
   --platform <target>  Target platform, android by default
   --out <dir>          Artifact directory, defaults to artifacts/qa-agent
   --mock-report <path> Fixture-only write_report payload path
+  --mock-device-driver Use the fixture Mobile Device Driver for contract tests
   -h, --help           Show this help message
 
 The command writes exactly one validated QA Report artifact named qa-report.json.`);
@@ -396,7 +405,7 @@ The command writes exactly one validated QA Report artifact named qa-report.json
 Commands:
   init            Scaffold Android-first Expo/EAS QA Agent files
   doctor          Validate QA Agent Config
-  run             Run a mocked QA Run through the Eve session contract
+  run             Run a QA Run through the Eve session contract
   render-comment  Render or upsert the single QA Agent PR comment
 
 Run "qa-agent init --help" for command options.

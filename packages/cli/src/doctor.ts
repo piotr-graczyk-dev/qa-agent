@@ -1,4 +1,5 @@
 import { loadQaAgentConfig, type QaAgentConfig } from "./config.js";
+import { checkAgentDeviceAvailability } from "./mobile-device-driver.js";
 
 export type DoctorResult =
   | { ok: true; messages: string[] }
@@ -17,16 +18,21 @@ export async function runDoctor(configPath: string): Promise<DoctorResult> {
     };
   }
 
-  const credentialIssues = validateCredentials(result.config);
-  if (credentialIssues.length > 0) {
+  const environmentIssues = [
+    ...validateCredentials(result.config),
+    ...validateAgentDevice(),
+  ];
+  if (environmentIssues.length > 0) {
     return {
       ok: false,
       messages: [
-        `QA Agent doctor found ${credentialIssues.length} environment issue${credentialIssues.length === 1 ? "" : "s"}.`,
-        ...credentialIssues.map((error) => `- ${error}`),
+        `QA Agent doctor found ${environmentIssues.length} environment issue${environmentIssues.length === 1 ? "" : "s"}.`,
+        ...environmentIssues.map((error) => `- ${error}`),
       ],
     };
   }
+
+  const agentDevice = checkAgentDeviceAvailability();
 
   return {
     ok: true,
@@ -37,6 +43,8 @@ export async function runDoctor(configPath: string): Promise<DoctorResult> {
       `- Target platforms: ${result.config.targetPlatforms.join(", ")}`,
       `- Model: ${result.config.model.provider}/${result.config.model.modelId}`,
       `- Screenshot storage: ${formatScreenshotStorage(result.config.screenshotStorage)}`,
+      `- Mobile Device Driver: agent-device ${agentDevice.ok ? agentDevice.version : "unavailable"}`,
+      `- Action safety: ${formatActionSafetyPolicy(result.config.actionSafetyPolicy)}`,
     ],
   };
 }
@@ -56,6 +64,15 @@ function validateCredentials(config: QaAgentConfig): string[] {
   ];
 }
 
+function validateAgentDevice(): string[] {
+  const agentDevice = checkAgentDeviceAvailability();
+  if (agentDevice.ok) {
+    return [];
+  }
+
+  return [`mobileDeviceDriver: ${agentDevice.message}`];
+}
+
 function formatScreenshotStorage(
   storage: QaAgentConfig["screenshotStorage"],
 ): string {
@@ -64,4 +81,14 @@ function formatScreenshotStorage(
   }
 
   return `vercel-blob (${storage.tokenEnv})`;
+}
+
+function formatActionSafetyPolicy(
+  policy: QaAgentConfig["actionSafetyPolicy"],
+): string {
+  if (policy.mode === "safe_only") {
+    return "safe_only";
+  }
+
+  return `allow_project_actions (${policy.allowedIntents.length} allowed, ${policy.forbiddenIntents.length} forbidden)`;
 }

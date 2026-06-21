@@ -40,6 +40,7 @@ describe("qa-agent run", () => {
       prContextPath,
       "--out",
       outDir,
+      "--mock-device-driver",
     ]);
 
     assert.equal(result.status, 0);
@@ -67,6 +68,7 @@ describe("qa-agent run", () => {
       outDir,
       "--mock-report",
       path.join(testDir, "fixtures/reports/invalid-report.json"),
+      "--mock-device-driver",
     ]);
 
     assert.equal(result.status, 0);
@@ -96,6 +98,7 @@ describe("qa-agent run", () => {
       outDir,
       "--mock-report",
       malformedReportPath,
+      "--mock-device-driver",
     ]);
 
     assert.equal(result.status, 0);
@@ -120,6 +123,7 @@ describe("qa-agent run", () => {
       outDir,
       "--mock-report",
       path.join(outDir, "missing-report.json"),
+      "--mock-device-driver",
     ]);
 
     assert.equal(result.status, 0);
@@ -147,6 +151,7 @@ describe("qa-agent run", () => {
       malformedPrContextPath,
       "--out",
       outDir,
+      "--mock-device-driver",
     ]);
 
     assert.equal(result.status, 1);
@@ -164,6 +169,7 @@ describe("qa-agent run", () => {
       prContextPath,
       "--platform",
       "web",
+      "--mock-device-driver",
     ]);
 
     assert.equal(result.status, 1);
