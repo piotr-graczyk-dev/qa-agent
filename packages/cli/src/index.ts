@@ -9,6 +9,19 @@ export {
   type SafeMobileActionIntent,
 } from "./action-safety.js";
 export {
+  authProfileSchema,
+  authProfilesSchema,
+  createAuthProfileRedactor,
+  createAuthRuntimeTools,
+  loginTypeSchema,
+  readAuthProfileSecretEnvNames,
+  type AuthProfile,
+  type AuthProfiles,
+  type AuthRuntimeTools,
+  type LoginType,
+  type LoginWithProfileResult,
+} from "./auth-profiles.js";
+export {
   QA_AGENT_COMMENT_MARKER,
   createGitHubCommentClient,
   loadPlatformReport,
@@ -62,4 +75,12 @@ export {
 } from "./contracts.js";
 export { runDoctor, type DoctorResult } from "./doctor.js";
 export { runInit, type InitFileResult, type InitResult } from "./init.js";
+export {
+  createSecretRedactor,
+  defaultSecretRedactor,
+  redactJsonValue,
+  redactSecretLikeText,
+  REDACTED,
+  type SecretRedactor,
+} from "./redaction.js";
 export { runQaAgent, type RunOptions, type RunResult } from "./run.js";

@@ -62,6 +62,51 @@ function writeConfig(outDir, actionSafetyPolicy) {
   return configPath;
 }
 
+function writeAuthConfig(outDir) {
+  const configPath = path.join(outDir, "qa-agent.config.mjs");
+  writeFileSync(
+    configPath,
+    `export default ${JSON.stringify(
+      {
+        targetPlatforms: ["android"],
+        model: {
+          provider: "openai",
+          modelId: "gpt-4.1",
+          apiKeyEnv: "OPENAI_API_KEY",
+        },
+        app: {
+          adapter: "expo-eas",
+          easProjectId: "00000000-0000-0000-0000-000000000000",
+          android: {
+            applicationId: "com.example.qaagent",
+          },
+        },
+        screenshotStorage: {
+          provider: "artifact",
+          artifactsDir: "qa-agent/screenshots",
+        },
+        actionSafetyPolicy: {
+          mode: "safe_only",
+        },
+        authProfiles: {
+          qa_user: {
+            type: "email_password",
+            emailEnv: "QA_AGENT_LOGIN_EMAIL",
+            passwordEnv: "QA_AGENT_LOGIN_PASSWORD",
+            emailField: 'id="email"',
+            passwordField: 'id="password"',
+            submitButton: 'id="submit"',
+          },
+        },
+      },
+      null,
+      2,
+    )};\n`,
+    "utf8",
+  );
+  return configPath;
+}
+
 describe("qa-agent run", () => {
   it("executes a mocked QA Run and writes exactly one validated QA Report artifact", () => {
     const outDir = createOutDir();
@@ -200,6 +245,85 @@ describe("qa-agent run", () => {
     assert.deepEqual(report.screenshots, []);
     assert.match(report.diagnostics.join("\n"), /take_screenshot was blocked/);
     assert.match(report.diagnostics.join("\n"), /Expected exactly one write_report/);
+  });
+
+  it("logs in with a configured Auth Profile before producing the report", () => {
+    const outDir = createOutDir();
+    const configPath = writeAuthConfig(outDir);
+    const result = spawnSync(
+      process.execPath,
+      [
+        cliPath,
+        "run",
+        "--project",
+        projectDir,
+        "--config",
+        configPath,
+        "--pr-context",
+        prContextPath,
+        "--out",
+        outDir,
+        "--mock-device-driver",
+      ],
+      {
+        cwd: path.resolve(testDir, "../../.."),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          QA_AGENT_LOGIN_EMAIL: "qa@example.com",
+          QA_AGENT_LOGIN_PASSWORD: "super-secret-password",
+        },
+      },
+    );
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Status: passed/);
+    assert.equal(result.stderr, "");
+
+    const report = readReport(outDir);
+    assert.equal(report.status, "passed");
+    assert.match(report.checksPerformed.join("\n"), /Auth Profile/);
+    assert.doesNotMatch(JSON.stringify(report), /qa@example\.com/);
+    assert.doesNotMatch(JSON.stringify(report), /super-secret-password/);
+  });
+
+  it("turns missing Auth Profile secrets into a blocked report with redacted diagnostics", () => {
+    const outDir = createOutDir();
+    const configPath = writeAuthConfig(outDir);
+    const result = spawnSync(
+      process.execPath,
+      [
+        cliPath,
+        "run",
+        "--project",
+        projectDir,
+        "--config",
+        configPath,
+        "--pr-context",
+        prContextPath,
+        "--out",
+        outDir,
+        "--mock-device-driver",
+      ],
+      {
+        cwd: path.resolve(testDir, "../../.."),
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          QA_AGENT_LOGIN_EMAIL: "qa@example.com",
+          QA_AGENT_LOGIN_PASSWORD: "",
+        },
+      },
+    );
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Status: blocked/);
+    assert.equal(result.stderr, "");
+
+    const report = readReport(outDir);
+    assert.equal(report.status, "blocked");
+    assert.match(report.diagnostics.join("\n"), /QA_AGENT_LOGIN_PASSWORD/);
+    assert.doesNotMatch(JSON.stringify(report), /qa@example\.com/);
   });
 
   it("reports malformed PR Context JSON without throwing", () => {

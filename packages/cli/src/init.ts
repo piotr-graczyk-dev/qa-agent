@@ -49,6 +49,7 @@ export default defineQaAgentConfig({
   actionSafetyPolicy: {
     mode: "safe_only",
   },
+  authProfiles: {},
 });
 `,
   },

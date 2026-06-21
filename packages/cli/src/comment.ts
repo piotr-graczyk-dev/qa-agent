@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { validateQaReport, type QaReport } from "./contracts.js";
+import { defaultSecretRedactor, redactJsonValue } from "./redaction.js";
 
 export const QA_AGENT_COMMENT_MARKER = "<!-- qa-agent:report-comment:v1 -->";
 
@@ -33,7 +34,7 @@ export async function loadPlatformReport(
 ): Promise<PlatformReport> {
   const raw = await readFile(input.path, "utf8");
   const parsed = JSON.parse(raw) as unknown;
-  const result = validateQaReport(parsed);
+  const result = validateQaReport(redactJsonValue(parsed, defaultSecretRedactor));
 
   if (!result.ok) {
     throw new Error(
@@ -54,7 +55,7 @@ export function renderQaReportComment(reports: PlatformReport[]): string {
     throw new Error("At least one QA Report is required.");
   }
 
-  const sortedReports = [...reports].sort(
+  const sortedReports = reports.map(redactPlatformReport).sort(
     (left, right) => platformOrder(left.platform) - platformOrder(right.platform),
   );
 
@@ -66,6 +67,17 @@ export function renderQaReportComment(reports: PlatformReport[]): string {
     "",
     ...sortedReports.flatMap(renderPlatformReport),
   ].join("\n");
+}
+
+function redactPlatformReport(report: PlatformReport): PlatformReport {
+  return {
+    platform: report.platform,
+    report: redactQaReport(report.report),
+  };
+}
+
+function redactQaReport(report: QaReport): QaReport {
+  return redactJsonValue(report, defaultSecretRedactor);
 }
 
 export async function upsertQaReportComment(
