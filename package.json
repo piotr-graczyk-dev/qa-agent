@@ -13,8 +13,9 @@
   "scripts": {
     "build": "eve build",
     "dev": "eve dev",
+    "pretest": "npm run build --workspace qa-agent",
     "start": "eve start",
-    "test": "node --import tsx --test packages/cli/test/*.test.ts",
+    "test": "node --test packages/cli/test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -25,7 +26,6 @@
   },
   "devDependencies": {
     "@types/node": "24.x",
-    "tsx": "^4.20.6",
     "typescript": "7.0.1-rc"
   },
   "overrides": {

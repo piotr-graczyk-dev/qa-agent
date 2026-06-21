@@ -12,10 +12,10 @@ type ParsedCli = {
 };
 
 const DEFAULT_CONFIG_FILES = [
-  "qa-agent.config.ts",
-  "qa-agent.config.mts",
   "qa-agent.config.mjs",
   "qa-agent.config.js",
+  "qa-agent.config.ts",
+  "qa-agent.config.mts",
 ] as const;
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
@@ -123,9 +123,12 @@ function printHelp(scope: "root" | "doctor"): void {
 Validate a QA Agent Config for an Expo/EAS mobile QA project.
 
 Options:
-  --project <dir>   Project directory containing qa-agent.config.ts or .mjs
+  --project <dir>   Project directory containing qa-agent.config.mjs, .js, .ts, or .mts
   --config <path>   Config path, relative to --project unless absolute
-  -h, --help        Show this help message`);
+  -h, --help        Show this help message
+
+Default discovery prefers runnable JavaScript config files before TypeScript.
+TypeScript config files require a Node loader that can import TypeScript.`);
     return;
   }
 

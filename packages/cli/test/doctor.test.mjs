@@ -5,10 +5,10 @@ import { describe, it } from "node:test";
 import { fileURLToPath } from "node:url";
 
 const testDir = path.dirname(fileURLToPath(import.meta.url));
-const cliPath = path.resolve(testDir, "../src/cli.ts");
+const cliPath = path.resolve(testDir, "../dist/cli.js");
 
-function runCli(args: string[]) {
-  return spawnSync(process.execPath, ["--import", "tsx", cliPath, ...args], {
+function runCli(args) {
+  return spawnSync(process.execPath, [cliPath, ...args], {
     cwd: path.resolve(testDir, "../../.."),
     encoding: "utf8",
   });

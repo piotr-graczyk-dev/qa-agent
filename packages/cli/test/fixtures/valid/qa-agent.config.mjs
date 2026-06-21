@@ -1,4 +1,4 @@
-import { defineQaAgentConfig } from "../../../src/index.js";
+import { defineQaAgentConfig } from "../../../dist/index.js";
 
 export default defineQaAgentConfig({
   targetPlatforms: ["android"],
