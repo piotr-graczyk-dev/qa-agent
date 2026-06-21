@@ -30,6 +30,25 @@ type SuccessfulMobileDeviceToolResult = Extract<
   { ok: true }
 >;
 
+export const RUNTIME_ACTION_NAMES = [
+  "login_with_profile",
+  "inspect_ui",
+  "take_screenshot",
+  "build_app",
+  "install_app",
+  "provision_device",
+  "launch_app",
+] as const;
+
+export type RuntimeActionName = (typeof RUNTIME_ACTION_NAMES)[number];
+
+const LOCAL_MODE_RESTRICTED_ACTIONS = new Set<RuntimeActionName>([
+  "build_app",
+  "install_app",
+  "provision_device",
+  "launch_app",
+]);
+
 export type RunOptions = {
   configPath: string;
   mode?: RunMode;
@@ -38,6 +57,7 @@ export type RunOptions = {
   prContextPath: string;
   mockReportPath?: string;
   mockDeviceDriver?: boolean;
+  mockRequestedAction?: RuntimeActionName;
 };
 
 export type RunMode = "ci" | "local";
@@ -119,6 +139,7 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
     }),
     authProfileName,
     options.mockReportPath,
+    options.mockRequestedAction,
     redactor,
   );
   const report = await collectReportFromEveSession(
@@ -162,6 +183,7 @@ function createFixtureEveRuntime(
   authTools: AuthRuntimeTools,
   authProfileName: string | undefined,
   mockReportPath: string | undefined,
+  mockRequestedAction: RuntimeActionName | undefined,
   redactor: SecretRedactor,
 ): EveSessionRuntime {
   return {
@@ -170,8 +192,32 @@ function createFixtureEveRuntime(
       yield eveEvent("turn.started", { platform: input.platform });
       yield eveEvent("message.received", { message: input.message });
 
+      if (mockRequestedAction) {
+        const blocked = localModeActionBlock(input.mode, mockRequestedAction);
+        if (blocked) {
+          yield* blockedActionEvents(mockRequestedAction, blocked);
+          return;
+        }
+
+        yield eveEvent("action.result", {
+          name: mockRequestedAction,
+          status: "completed",
+          result: mockActionResult(mockRequestedAction, {
+            command: `mock ${mockRequestedAction}`,
+            stdout: "{}",
+            stderr: "",
+          }),
+        });
+      }
+
       let login: LoginWithProfileResult | undefined;
       if (authProfileName) {
+        const blocked = localModeActionBlock(input.mode, "login_with_profile");
+        if (blocked) {
+          yield* blockedActionEvents("login_with_profile", blocked);
+          return;
+        }
+
         login = await authTools.loginWithProfile({ profileName: authProfileName });
         yield eveEvent("action.result", {
           name: "login_with_profile",
@@ -191,6 +237,12 @@ function createFixtureEveRuntime(
         }
       }
 
+      const inspectBlocked = localModeActionBlock(input.mode, "inspect_ui");
+      if (inspectBlocked) {
+        yield* blockedActionEvents("inspect_ui", inspectBlocked);
+        return;
+      }
+
       const screen = await tools.inspectUi({ interactiveOnly: true });
       yield eveEvent("action.result", {
         name: "inspect_ui",
@@ -203,6 +255,12 @@ function createFixtureEveRuntime(
         yield eveEvent("session.completed", {
           sessionId: "qa-agent-fixture-session",
         });
+        return;
+      }
+
+      const screenshotBlocked = localModeActionBlock(input.mode, "take_screenshot");
+      if (screenshotBlocked) {
+        yield* blockedActionEvents("take_screenshot", screenshotBlocked);
         return;
       }
 
@@ -246,6 +304,66 @@ function createFixtureEveRuntime(
       yield eveEvent("turn.completed", { finishReason: "stop" });
       yield eveEvent("session.completed", { sessionId: "qa-agent-fixture-session" });
     },
+  };
+}
+
+type LocalModeActionBlock = {
+  ok: false;
+  action: RuntimeActionName;
+  blocked: true;
+  reason: string;
+  diagnostics: string[];
+};
+
+function localModeActionBlock(
+  mode: RunMode,
+  action: RuntimeActionName,
+): LocalModeActionBlock | undefined {
+  if (mode !== "local" || !LOCAL_MODE_RESTRICTED_ACTIONS.has(action)) {
+    return undefined;
+  }
+
+  const reason = `Local debug mode cannot run ${action}; the app and device must already be running.`;
+  return {
+    ok: false,
+    action,
+    blocked: true,
+    reason,
+    diagnostics: [
+      reason,
+      "Use qa-agent run in CI after provisioning, installation, and launch have already been handled by the EAS workflow.",
+    ],
+  };
+}
+
+function* blockedActionEvents(
+  action: RuntimeActionName,
+  blocked: LocalModeActionBlock,
+): Iterable<HandleMessageStreamEvent> {
+  yield eveEvent("action.result", {
+    name: action,
+    status: "failed",
+    result: blocked,
+  });
+  yield eveEvent("turn.failed", {
+    message: blocked.reason,
+    diagnostics: blocked.diagnostics,
+  });
+  yield eveEvent("turn.completed", { finishReason: "tool_blocked" });
+  yield eveEvent("session.completed", {
+    sessionId: "qa-agent-fixture-session",
+  });
+}
+
+function mockActionResult(
+  action: RuntimeActionName,
+  result: SuccessfulMobileDeviceToolResult["result"],
+): SuccessfulMobileDeviceToolResult {
+  return {
+    ok: true,
+    action,
+    intent: action,
+    result,
   };
 }
 

@@ -162,6 +162,40 @@ describe("qa-agent run", () => {
     assert.equal(report.screenshots.length, 1);
   });
 
+  for (const action of [
+    "build_app",
+    "install_app",
+    "provision_device",
+    "launch_app",
+  ]) {
+    it(`blocks ${action} in local debug mode`, () => {
+      const outDir = createOutDir();
+      const result = runCli([
+        "run-local",
+        "--project",
+        projectDir,
+        "--pr-context",
+        prContextPath,
+        "--out",
+        outDir,
+        "--mock-device-driver",
+        "--mock-requested-action",
+        action,
+      ]);
+
+      assert.equal(result.status, 0);
+      assert.match(result.stdout, /QA Agent local debug run completed/);
+      assert.match(result.stdout, /Status: blocked/);
+      assert.equal(result.stderr, "");
+
+      const report = readReport(outDir);
+      assert.equal(report.status, "blocked");
+      assert.match(report.diagnostics.join("\n"), new RegExp(action));
+      assert.match(report.diagnostics.join("\n"), /already be running/);
+      assert.deepEqual(report.screenshots, []);
+    });
+  }
+
   it("turns an invalid write_report result into a blocked report with diagnostics", () => {
     const outDir = createOutDir();
     const result = runCli([

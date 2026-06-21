@@ -10,7 +10,11 @@ import {
 } from "./comment.js";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
-import { runQaAgent } from "./run.js";
+import {
+  RUNTIME_ACTION_NAMES,
+  runQaAgent,
+  type RuntimeActionName,
+} from "./run.js";
 
 type ParsedCli = {
   command?: string;
@@ -18,6 +22,7 @@ type ParsedCli = {
   configPath?: string;
   mockReportPath?: string;
   mockDeviceDriver: boolean;
+  mockRequestedAction?: RuntimeActionName;
   outDir?: string;
   platform?: "android" | "ios";
   prContextPath?: string;
@@ -87,6 +92,7 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
     const result = await runQaAgent({
       configPath,
       mode: parsed.command === "run-local" ? "local" : "ci",
+      mockRequestedAction: parsed.mockRequestedAction,
       mockReportPath: parsed.mockReportPath
         ? resolveProjectPath(parsed.projectDir, parsed.mockReportPath)
         : undefined,
@@ -167,6 +173,17 @@ function parseArgs(argv: string[]): ParsedCli {
 
     if (arg === "--mock-device-driver") {
       parsed.mockDeviceDriver = true;
+      continue;
+    }
+
+    if (arg === "--mock-requested-action") {
+      const action = requireValue(argv, index, arg);
+      if (isRuntimeActionName(action)) {
+        parsed.mockRequestedAction = action;
+      } else {
+        parsed.error = `${arg} must be one of: ${RUNTIME_ACTION_NAMES.join(", ")}`;
+      }
+      index += 1;
       continue;
     }
 
@@ -335,6 +352,10 @@ function parsePositiveInteger(value: string, flag: string): number {
   return parsed;
 }
 
+function isRuntimeActionName(value: string): value is RuntimeActionName {
+  return RUNTIME_ACTION_NAMES.includes(value as RuntimeActionName);
+}
+
 function printHelp(
   scope: "root" | "init" | "doctor" | "run" | "run-local" | "render-comment",
 ): void {
@@ -397,6 +418,8 @@ Options:
   --out <dir>          Artifact directory, defaults to artifacts/qa-agent
   --mock-report <path> Fixture-only write_report payload path
   --mock-device-driver Use the fixture Mobile Device Driver for contract tests
+  --mock-requested-action <name>
+                       Fixture-only action request for contract tests
   -h, --help           Show this help message
 
 The command writes exactly one validated QA Report artifact named qa-report.json.`);
@@ -416,6 +439,8 @@ Options:
   --out <dir>          Artifact directory, defaults to artifacts/qa-agent
   --mock-report <path> Fixture-only write_report payload path
   --mock-device-driver Use the fixture Mobile Device Driver for contract tests
+  --mock-requested-action <name>
+                       Fixture-only action request for contract tests
   -h, --help           Show this help message
 
 Local debug mode assumes the app and device are already running. It does not build, install, provision, or launch them. The command writes exactly one validated QA Report artifact named qa-report.json.`);
