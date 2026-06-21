@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { runDoctor } from "./doctor.js";
+import { runInit } from "./init.js";
 
 type ParsedCli = {
   command?: string;
@@ -22,7 +23,23 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
   const parsed = parseArgs(argv);
 
   if (parsed.help || !parsed.command) {
-    printHelp(parsed.command === "doctor" ? "doctor" : "root");
+    printHelp(
+      parsed.command === "doctor"
+        ? "doctor"
+        : parsed.command === "init"
+          ? "init"
+          : "root",
+    );
+    return 0;
+  }
+
+  if (parsed.command === "init") {
+    const result = await runInit(parsed.projectDir);
+    console.log(`QA Agent init completed: ${result.projectDir}`);
+    for (const file of result.files) {
+      console.log(`- ${file.status}: ${file.path}`);
+    }
+
     return 0;
   }
 
@@ -116,7 +133,20 @@ function requireValue(argv: string[], index: number, flag: string): string {
   return value;
 }
 
-function printHelp(scope: "root" | "doctor"): void {
+function printHelp(scope: "root" | "init" | "doctor"): void {
+  if (scope === "init") {
+    console.log(`Usage: qa-agent init [--project <dir>]
+
+Scaffold Android-first Expo/EAS QA Agent setup files.
+
+Options:
+  --project <dir>   Project directory where setup files are written
+  -h, --help        Show this help message
+
+The initializer writes QA Agent config, EAS workflow, and support scripts only.`);
+    return;
+  }
+
   if (scope === "doctor") {
     console.log(`Usage: qa-agent doctor [--project <dir>] [--config <path>]
 
@@ -135,8 +165,10 @@ TypeScript config files require a Node loader that can import TypeScript.`);
   console.log(`Usage: qa-agent <command>
 
 Commands:
+  init     Scaffold Android-first Expo/EAS QA Agent files
   doctor   Validate QA Agent Config
 
+Run "qa-agent init --help" for command options.
 Run "qa-agent doctor --help" for command options.`);
 }
 
