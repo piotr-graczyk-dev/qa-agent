@@ -1,4 +1,16 @@
 export {
+  QA_AGENT_COMMENT_MARKER,
+  createGitHubCommentClient,
+  loadPlatformReport,
+  renderQaReportComment,
+  upsertQaReportComment,
+  type GitHubComment,
+  type GitHubCommentClient,
+  type LoadPlatformReportInput,
+  type PlatformReport,
+  type UpsertQaReportCommentResult,
+} from "./comment.js";
+export {
   defineQaAgentConfig,
   loadQaAgentConfig,
   qaAgentConfigSchema,

@@ -1,0 +1,22 @@
+{
+  "status": "failed",
+  "summary": "The changed onboarding flow launched on iOS, but the final screen hid the continue button.",
+  "checksPerformed": [
+    "Launched the iOS preview build",
+    "Opened onboarding",
+    "Inspected the final onboarding screen"
+  ],
+  "issuesFound": [
+    {
+      "title": "Continue button is hidden",
+      "description": "The final onboarding screen renders below the safe area and the continue button is not reachable.",
+      "severity": "high"
+    }
+  ],
+  "screenshots": [
+    {
+      "path": "artifacts/ios/onboarding-final.png",
+      "caption": "iOS final onboarding screen with hidden action"
+    }
+  ]
+}
