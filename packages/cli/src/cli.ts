@@ -14,6 +14,7 @@ type ParsedCli = {
   outDir?: string;
   platform?: "android" | "ios";
   prContextPath?: string;
+  error?: string;
   help: boolean;
 };
 
@@ -26,6 +27,11 @@ const DEFAULT_CONFIG_FILES = [
 
 export async function main(argv = process.argv.slice(2)): Promise<number> {
   const parsed = parseArgs(argv);
+
+  if (parsed.error) {
+    console.error(parsed.error);
+    return 1;
+  }
 
   if (parsed.help || !parsed.command) {
     printHelp(
@@ -143,7 +149,12 @@ function parseArgs(argv: string[]): ParsedCli {
     }
 
     if (arg === "--platform") {
-      parsed.platform = parsePlatform(requireValue(argv, index, arg));
+      const platform = requireValue(argv, index, arg);
+      if (platform === "android" || platform === "ios") {
+        parsed.platform = platform;
+      } else {
+        parsed.error = `--platform must be "android" or "ios", received "${platform}"`;
+      }
       index += 1;
       continue;
     }
@@ -200,14 +211,6 @@ function requireValue(argv: string[], index: number, flag: string): string {
     throw new Error(`${flag} requires a value`);
   }
   return value;
-}
-
-function parsePlatform(value: string): "android" | "ios" {
-  if (value === "android" || value === "ios") {
-    return value;
-  }
-
-  throw new Error(`--platform must be "android" or "ios", received "${value}"`);
 }
 
 function printHelp(scope: "root" | "init" | "doctor" | "run"): void {

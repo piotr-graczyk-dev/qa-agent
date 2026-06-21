@@ -58,9 +58,18 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
     };
   }
 
-  const prContextResult = validatePrContext(
-    JSON.parse(await readFile(options.prContextPath, "utf8")),
-  );
+  const prContextInput = await readJsonFile(options.prContextPath, "PR Context");
+  if (!prContextInput.ok) {
+    return {
+      ok: false,
+      messages: [
+        "QA Agent run found 1 PR Context issue.",
+        `- ${prContextInput.error}`,
+      ],
+    };
+  }
+
+  const prContextResult = validatePrContext(prContextInput.value);
   if (!prContextResult.ok) {
     return {
       ok: false,
@@ -120,16 +129,20 @@ function createFixtureEveRuntime(
         result: screenshot,
       });
 
-      const report =
+      const reportResult =
         mockReportPath === undefined
-          ? defaultMockReport(input, screenshot)
+          ? { ok: true as const, value: defaultMockReport(input, screenshot) }
           : await readMockReport(mockReportPath);
 
-      if (report !== undefined) {
+      if (!reportResult.ok) {
+        yield eveEvent("turn.failed", { message: reportResult.error });
+      }
+
+      if (reportResult.ok) {
         yield eveEvent("action.result", {
           name: "write_report",
           status: "completed",
-          result: report,
+          result: reportResult.value,
         });
       }
 
@@ -139,13 +152,37 @@ function createFixtureEveRuntime(
   };
 }
 
-async function readMockReport(mockReportPath: string): Promise<unknown> {
-  const raw = await readFile(mockReportPath, "utf8");
-  if (raw.trim() === "") {
-    return undefined;
+async function readMockReport(mockReportPath: string): Promise<ReadJsonResult> {
+  return readJsonFile(mockReportPath, "mock write_report");
+}
+
+type ReadJsonResult =
+  | { ok: true; value: unknown }
+  | { ok: false; error: string };
+
+async function readJsonFile(
+  filePath: string,
+  label: string,
+): Promise<ReadJsonResult> {
+  let raw: string;
+
+  try {
+    raw = await readFile(filePath, "utf8");
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Failed to read ${label} JSON: ${formatErrorMessage(error)}`,
+    };
   }
 
-  return JSON.parse(raw);
+  try {
+    return { ok: true, value: JSON.parse(raw) };
+  } catch (error) {
+    return {
+      ok: false,
+      error: `Failed to parse ${label} JSON: ${formatErrorMessage(error)}`,
+    };
+  }
 }
 
 async function collectReportFromEveSession(
@@ -240,6 +277,10 @@ function readFailureMessage(data: unknown): string {
   }
 
   return "Eve runtime reported a failed session event.";
+}
+
+function formatErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 function eveEvent(

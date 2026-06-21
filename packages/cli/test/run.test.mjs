@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import path from "node:path";
@@ -81,6 +81,33 @@ describe("qa-agent run", () => {
     assert.match(report.diagnostics.join("\n"), /status/);
   });
 
+  it("turns malformed mock write_report JSON into a blocked report with diagnostics", () => {
+    const outDir = createOutDir();
+    const malformedReportPath = path.join(outDir, "malformed-report.txt");
+    writeFileSync(malformedReportPath, "{", "utf8");
+
+    const result = runCli([
+      "run",
+      "--project",
+      projectDir,
+      "--pr-context",
+      prContextPath,
+      "--out",
+      outDir,
+      "--mock-report",
+      malformedReportPath,
+    ]);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /Status: blocked/);
+    assert.equal(result.stderr, "");
+
+    const report = readReport(outDir);
+    assert.equal(report.status, "blocked");
+    assert.match(report.diagnostics.join("\n"), /Failed to parse mock write_report JSON/);
+    assert.match(report.diagnostics.join("\n"), /Expected exactly one write_report/);
+  });
+
   it("turns a missing write_report result into a blocked report with diagnostics", () => {
     const outDir = createOutDir();
     const result = runCli([
@@ -92,7 +119,7 @@ describe("qa-agent run", () => {
       "--out",
       outDir,
       "--mock-report",
-      path.join(testDir, "fixtures/reports/missing-report.json"),
+      path.join(outDir, "missing-report.json"),
     ]);
 
     assert.equal(result.status, 0);
@@ -103,7 +130,46 @@ describe("qa-agent run", () => {
     const report = readReport(outDir);
     assert.equal(report.status, "blocked");
     assert.match(report.diagnostics.join("\n"), /Expected exactly one write_report/);
+    assert.match(report.diagnostics.join("\n"), /Failed to read mock write_report JSON/);
     assert.match(report.diagnostics.join("\n"), /not provided/);
+  });
+
+  it("reports malformed PR Context JSON without throwing", () => {
+    const outDir = createOutDir();
+    const malformedPrContextPath = path.join(outDir, "malformed-pr-context.txt");
+    writeFileSync(malformedPrContextPath, "{", "utf8");
+
+    const result = runCli([
+      "run",
+      "--project",
+      projectDir,
+      "--pr-context",
+      malformedPrContextPath,
+      "--out",
+      outDir,
+    ]);
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /QA Agent run found 1 PR Context issue/);
+    assert.match(result.stderr, /Failed to parse PR Context JSON/);
+  });
+
+  it("reports invalid platform values without throwing", () => {
+    const result = runCli([
+      "run",
+      "--project",
+      projectDir,
+      "--pr-context",
+      prContextPath,
+      "--platform",
+      "web",
+    ]);
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /--platform must be "android" or "ios"/);
+    assert.doesNotMatch(result.stderr, /Error:/);
   });
 
   it("prints help for the run command", () => {
