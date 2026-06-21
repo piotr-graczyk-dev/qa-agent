@@ -1,7 +1,11 @@
 {
-  "name": "qa-agent",
+  "name": "qa-agent-workspace",
   "version": "0.0.0",
+  "private": true,
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
   "imports": {
     "#*": "./agent/*",
     "#evals/*": "./evals/*"
@@ -10,7 +14,8 @@
     "build": "eve build",
     "dev": "eve dev",
     "start": "eve start",
-    "typecheck": "tsc"
+    "test": "node --import tsx --test packages/cli/test/*.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@vercel/connect": "0.2.2",
@@ -20,6 +25,7 @@
   },
   "devDependencies": {
     "@types/node": "24.x",
+    "tsx": "^4.20.6",
     "typescript": "7.0.1-rc"
   },
   "overrides": {
