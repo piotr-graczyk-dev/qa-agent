@@ -1,0 +1,22 @@
+name: QA Agent Android Dogfood
+
+on:
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  qa_agent_android:
+    type: build
+    params:
+      platform: android
+      profile: preview
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Provision QA Agent tooling
+        run: ./scripts/qa-agent/provision-tooling.sh
+      - name: Validate QA Agent configuration
+        run: npx qa-agent doctor --project .
+      - name: Run QA Agent
+        run: npx qa-agent run --project . --platform android --pr-context qa-agent/pr-context.json

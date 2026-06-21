@@ -61,6 +61,26 @@ describe("qa-agent doctor", () => {
     assert.equal(result.stderr, "");
   });
 
+  it("accepts the Expo dogfood example config with deterministic auth env vars", () => {
+    const result = runCliWithEnv(
+      [
+        "doctor",
+        "--project",
+        path.resolve(testDir, "../../../examples/expo-basic"),
+      ],
+      fakeAgentDeviceEnv({
+        QA_AGENT_EXAMPLE_EMAIL: "qa@example.test",
+        QA_AGENT_EXAMPLE_PASSWORD: "qa-agent-password",
+      }),
+    );
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /QA Agent doctor passed/);
+    assert.match(result.stdout, /App adapter: expo-eas/);
+    assert.match(result.stdout, /Target platforms: android/);
+    assert.equal(result.stderr, "");
+  });
+
   it("defaults screenshot storage to artifact without third-party credentials", () => {
     const result = runCli([
       "doctor",
