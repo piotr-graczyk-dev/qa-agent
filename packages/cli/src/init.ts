@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 export type InitStatus = "created" | "unchanged" | "skipped";
@@ -19,6 +19,9 @@ type GeneratedFile = {
   contents: string;
   mode?: number;
 };
+
+const nonFileCollision = Symbol("nonFileCollision");
+type ExistingFile = string | typeof nonFileCollision | undefined;
 
 const GENERATED_FILES: GeneratedFile[] = [
   {
@@ -126,16 +129,52 @@ async function writeGeneratedFile(
   return { path: absolutePath, status: "created" };
 }
 
-async function readExistingFile(filePath: string): Promise<string | undefined> {
+async function readExistingFile(filePath: string): Promise<ExistingFile> {
   try {
-    return await readFile(filePath, "utf8");
+    const stats = await lstat(filePath);
+    if (!stats.isFile()) {
+      return nonFileCollision;
+    }
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-        return undefined;
-      }
+    if (isFileNotFound(error)) {
+      return undefined;
+    }
+
+    if (isNonFileCollision(error)) {
+      return nonFileCollision;
     }
 
     throw error;
   }
+
+  try {
+    return await readFile(filePath, "utf8");
+  } catch (error) {
+    if (isFileNotFound(error)) {
+      return undefined;
+    }
+
+    if (isNonFileCollision(error)) {
+      return nonFileCollision;
+    }
+
+    throw error;
+  }
+}
+
+function isFileNotFound(error: unknown): boolean {
+  return getErrorCode(error) === "ENOENT";
+}
+
+function isNonFileCollision(error: unknown): boolean {
+  const code = getErrorCode(error);
+  return code === "EISDIR" || code === "ENOTDIR";
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (error && typeof error === "object" && "code" in error) {
+    return (error as NodeJS.ErrnoException).code;
+  }
+
+  return undefined;
 }

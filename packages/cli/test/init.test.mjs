@@ -149,6 +149,36 @@ describe("qa-agent init", () => {
     );
   });
 
+  it("skips generated paths that collide with directories or non-file parents", async () => {
+    const directoryCollisionProject = await createExpoFixture();
+    await mkdir(path.join(directoryCollisionProject, "qa-agent.config.mjs"));
+
+    const directoryCollision = runCli([
+      "init",
+      "--project",
+      directoryCollisionProject,
+    ]);
+
+    assert.equal(directoryCollision.status, 0);
+    assert.match(
+      directoryCollision.stdout,
+      /skipped: .*qa-agent\.config\.mjs/,
+    );
+    assert.equal(directoryCollision.stderr, "");
+
+    const parentCollisionProject = await createExpoFixture();
+    await writeFile(
+      path.join(parentCollisionProject, ".eas"),
+      "not a directory\n",
+    );
+
+    const parentCollision = runCli(["init", "--project", parentCollisionProject]);
+
+    assert.equal(parentCollision.status, 0);
+    assert.match(parentCollision.stdout, /skipped: .*qa-agent-android\.yml/);
+    assert.equal(parentCollision.stderr, "");
+  });
+
   it("prints help for the init command", () => {
     const result = runCli(["init", "--help"]);
 
