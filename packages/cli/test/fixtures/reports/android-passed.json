@@ -1,0 +1,16 @@
+{
+  "status": "passed",
+  "summary": "The changed onboarding flow opened and rendered correctly on Android.",
+  "checksPerformed": [
+    "Launched the Expo preview build",
+    "Opened onboarding",
+    "Captured the completed onboarding screen"
+  ],
+  "issuesFound": [],
+  "screenshots": [
+    {
+      "path": "artifacts/android/onboarding.png",
+      "caption": "Android onboarding complete state"
+    }
+  ]
+}
