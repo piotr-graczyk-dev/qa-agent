@@ -34,6 +34,12 @@ export {
   type UpsertQaReportCommentResult,
 } from "./comment.js";
 export {
+  createGitHubPrContextClient,
+  writeGitHubPrContext,
+  type GitHubContextOptions,
+  type GitHubContextResult,
+} from "./github-context.js";
+export {
   buildScreenshotPath,
   checkAgentDeviceAvailability,
   createAgentDeviceDriver,
