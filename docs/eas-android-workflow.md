@@ -25,9 +25,12 @@ The generated experimental iOS workflow mirrors that path for a simulator build:
    `artifacts/qa-agent/ios/qa-report.json`.
 7. Render or update the same stable QA Agent pull request comment.
 
-Both generated platform workflows call `render-comment` with any Android and
-iOS report artifacts that are present, so reviewers see one combined Android/iOS
-QA Agent comment when both reports are available.
+Both generated platform workflows call `render-comment --upload-media` with any
+Android and iOS report artifacts that are present, so reviewers see one combined
+Android/iOS QA Agent comment when both reports are available. With artifact
+storage, the comment links artifact paths. With `screenshotStorage.provider:
+"vercel-blob"`, local screenshots and recordings are uploaded before the PR
+comment is rendered, screenshots are embedded inline, and recordings are linked.
 
 ## Required EAS and GitHub setup
 
@@ -43,8 +46,17 @@ QA Agent comment when both reports are available.
   `qa-agent.config.mjs`.
 - Set `QA_AGENT_IOS_BUNDLE_IDENTIFIER` to the iOS bundle identifier from
   `qa-agent.config.mjs`.
-- Ensure the workflow has a `GITHUB_TOKEN` that can read pull request metadata
-  and create or update issue comments.
+- Ensure the workflow has either a `GITHUB_TOKEN` that can read pull request
+  metadata and create or update issue comments, or configure `github.auth` with
+  GitHub App credentials so QA Agent can create an installation token for the
+  bot identity.
+- For GitHub App auth, set `QA_AGENT_GITHUB_APP_ID`,
+  `QA_AGENT_GITHUB_APP_PRIVATE_KEY`, and
+  `QA_AGENT_GITHUB_APP_INSTALLATION_ID` unless the config uses different env
+  names.
+- To embed screenshots and link recordings directly in the PR comment, switch
+  `screenshotStorage.provider` to `vercel-blob` and set the configured blob
+  token env var, `BLOB_READ_WRITE_TOKEN` by default.
 - Set the model API key secret named by `model.apiKeyEnv`, for example
   `QA_AGENT_MODEL_API_KEY`.
 - Set every Auth Profile secret environment variable referenced by

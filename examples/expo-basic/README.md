@@ -42,7 +42,9 @@ export QA_AGENT_EXAMPLE_PASSWORD=qa-agent-password
 The Android workflow also requires:
 
 - `GITHUB_TOKEN` with permission to read pull request metadata and upsert issue
-  comments.
+  comments, or the GitHub App env vars configured in `github.auth`.
+- `BLOB_READ_WRITE_TOKEN` when switching `screenshotStorage.provider` to
+  `vercel-blob` so screenshots and recordings are uploaded into the PR comment.
 - `QA_AGENT_MODEL_API_KEY`, matching `model.apiKeyEnv` in
   `qa-agent.config.mjs`.
 - `QA_AGENT_ANDROID_APK_PATH`, pointing at the APK produced or downloaded by the
@@ -58,7 +60,8 @@ The experimental iOS workflow also requires:
 Before using the example against a real pull request, replace the deterministic
 `qa-agent/pr-context.json` fixture with the workflow-generated GitHub PR
 Context and make sure EAS retains `artifacts/qa-agent/android` and, when iOS is
-run, `artifacts/qa-agent/ios` as QA Report and screenshot artifact directories.
+run, `artifacts/qa-agent/ios` as QA Report, screenshot, and recording artifact
+directories.
 
 For local config validation, install the repo dependencies, build the CLI, and
 run doctor from the repository root with `agent-device` available:

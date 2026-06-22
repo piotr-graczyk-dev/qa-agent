@@ -1,4 +1,7 @@
 import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { put } from "@vercel/blob";
+import type { ScreenshotStorage } from "./config.js";
 import { validateQaReport, type QaReport } from "./contracts.js";
 import { defaultSecretRedactor, redactJsonValue } from "./redaction.js";
 
@@ -28,6 +31,8 @@ export type GitHubCommentClient = {
 export type UpsertQaReportCommentResult =
   | { action: "created"; comment: GitHubComment }
   | { action: "updated"; comment: GitHubComment };
+
+type ReportMedia = QaReport["screenshots"][number] | QaReport["recordings"][number];
 
 export async function loadPlatformReport(
   input: LoadPlatformReportInput,
@@ -196,6 +201,10 @@ function renderPlatformReport({ platform, report }: PlatformReport): string[] {
     "",
     ...renderScreenshots(report.screenshots),
     "",
+    "**Recordings**",
+    "",
+    ...renderRecordings(report.recordings ?? []),
+    "",
   ];
 }
 
@@ -224,24 +233,130 @@ function renderScreenshots(screenshots: QaReport["screenshots"]): string[] {
   }
 
   return screenshots.map((screenshot) => {
-    const caption = screenshot.caption ? ` - ${screenshot.caption}` : "";
-    const location = renderScreenshotLocation(screenshot);
-    return `- ${location}${caption}`;
+    const caption = screenshot.caption ?? path.basename(screenshot.path);
+    const location = renderMediaLocation(screenshot);
+    if (screenshot.storage?.provider === "vercel-blob") {
+      return `- ![${escapeMarkdownAlt(caption)}](${screenshot.storage.url})`;
+    }
+
+    return `- ${location}${screenshot.caption ? ` - ${screenshot.caption}` : ""}`;
   });
 }
 
-function renderScreenshotLocation(
-  screenshot: QaReport["screenshots"][number],
-): string {
-  if (screenshot.storage?.provider === "vercel-blob") {
-    return `[${screenshot.path}](${screenshot.storage.url})`;
+function renderRecordings(recordings: QaReport["recordings"]): string[] {
+  if (recordings.length === 0) {
+    return ["- No recordings available."];
   }
 
-  if (screenshot.storage?.provider === "artifact") {
-    return screenshot.storage.artifactPath ?? screenshot.path;
+  return recordings.map((recording) => {
+    const caption = recording.caption ? ` - ${recording.caption}` : "";
+    return `- ${renderMediaLocation(recording)}${caption}`;
+  });
+}
+
+function renderMediaLocation(media: ReportMedia): string {
+  if (media.storage?.provider === "vercel-blob") {
+    return `[${media.path}](${media.storage.url})`;
   }
 
-  return screenshot.path;
+  if (media.storage?.provider === "artifact") {
+    return media.storage.artifactPath ?? media.path;
+  }
+
+  return media.path;
+}
+
+export async function uploadReportMedia(input: {
+  reports: PlatformReport[];
+  storage: ScreenshotStorage;
+  rootDir: string;
+  token?: string;
+  now?: () => number;
+}): Promise<PlatformReport[]> {
+  if (input.storage.provider !== "vercel-blob") {
+    return input.reports;
+  }
+
+  const token = input.token ?? process.env[input.storage.tokenEnv];
+  if (!token?.trim()) {
+    throw new Error(
+      `Vercel Blob media upload requires ${input.storage.tokenEnv} to be set.`,
+    );
+  }
+
+  const now = input.now?.() ?? Date.now();
+  const reports: PlatformReport[] = [];
+  for (const platformReport of input.reports) {
+    reports.push({
+      platform: platformReport.platform,
+      report: {
+        ...platformReport.report,
+        screenshots: await uploadMediaList({
+          media: platformReport.report.screenshots,
+          platform: platformReport.platform,
+          kind: "screenshots",
+          rootDir: input.rootDir,
+          token,
+          now,
+        }),
+        recordings: await uploadMediaList({
+          media: platformReport.report.recordings,
+          platform: platformReport.platform,
+          kind: "recordings",
+          rootDir: input.rootDir,
+          token,
+          now,
+        }),
+      },
+    });
+  }
+
+  return reports;
+}
+
+async function uploadMediaList<TMedia extends ReportMedia>(input: {
+  media: TMedia[];
+  platform: PlatformReport["platform"];
+  kind: "screenshots" | "recordings";
+  rootDir: string;
+  token: string;
+  now: number;
+}): Promise<TMedia[]> {
+  const uploaded: TMedia[] = [];
+  for (const media of input.media) {
+    if (media.storage?.provider === "vercel-blob") {
+      uploaded.push(media);
+      continue;
+    }
+
+    const filePath = path.isAbsolute(media.path)
+      ? media.path
+      : path.join(input.rootDir, media.path);
+    const body = await readFile(filePath);
+    const pathname = [
+      "qa-agent",
+      input.platform,
+      input.kind,
+      `${input.now}-${path.basename(media.path)}`,
+    ].join("/");
+    const blob = await put(pathname, body, {
+      access: "public",
+      token: input.token,
+    });
+    uploaded.push({
+      ...media,
+      storage: {
+        provider: "vercel-blob",
+        url: blob.url,
+      },
+    });
+  }
+
+  return uploaded;
+}
+
+function escapeMarkdownAlt(value: string): string {
+  return value.replaceAll("[", "(").replaceAll("]", ")");
 }
 
 function formatPlatform(platform: PlatformReport["platform"]): string {

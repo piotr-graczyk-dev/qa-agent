@@ -25,9 +25,9 @@ if [[ ! -f "$QA_AGENT_ANDROID_APK_PATH" ]]; then
 fi
 
 echo "Installing Android QA app from $QA_AGENT_ANDROID_APK_PATH."
-agent-device install --platform android --path "$QA_AGENT_ANDROID_APK_PATH" --session qa-agent-android
+agent-device install "$QA_AGENT_ANDROID_APPLICATION_ID" "$QA_AGENT_ANDROID_APK_PATH" --platform android --session qa-agent-android
 
 echo "Launching Android QA app $QA_AGENT_ANDROID_APPLICATION_ID."
-agent-device launch --platform android --app-id "$QA_AGENT_ANDROID_APPLICATION_ID" --session qa-agent-android
+agent-device open "$QA_AGENT_ANDROID_APPLICATION_ID" --platform android --session qa-agent-android
 
 echo "Android QA app is installed and launched."

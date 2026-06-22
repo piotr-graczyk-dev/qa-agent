@@ -6,10 +6,13 @@ import {
   createGitHubCommentClient,
   loadPlatformReport,
   renderQaReportComment,
+  uploadReportMedia,
   upsertQaReportComment,
   type PlatformReport,
 } from "./comment.js";
+import { loadQaAgentConfig, type QaAgentConfig } from "./config.js";
 import { runDoctor } from "./doctor.js";
+import { resolveGitHubToken } from "./github-auth.js";
 import { writeGitHubPrContext } from "./github-context.js";
 import { runInit } from "./init.js";
 import {
@@ -33,6 +36,7 @@ type ParsedCli = {
   repository?: string;
   pullRequestNumber?: number;
   githubToken?: string;
+  uploadMedia: boolean;
   error?: string;
   help: boolean;
 };
@@ -150,6 +154,7 @@ function parseArgs(argv: string[]): ParsedCli {
     command: argv[0],
     projectDir: process.cwd(),
     mockDeviceDriver: false,
+    uploadMedia: false,
     help: false,
   };
 
@@ -251,6 +256,11 @@ function parseArgs(argv: string[]): ParsedCli {
       continue;
     }
 
+    if (arg === "--upload-media") {
+      parsed.uploadMedia = true;
+      continue;
+    }
+
     if (!parsed.command) {
       parsed.command = arg;
       continue;
@@ -296,7 +306,16 @@ async function runRenderCommentCommand(parsed: ParsedCli): Promise<number> {
     );
   }
 
-  const body = renderQaReportComment(reports);
+  const config = await loadOptionalConfig(parsed);
+  const renderedReports =
+    parsed.uploadMedia && config
+      ? await uploadReportMedia({
+          reports,
+          storage: config.screenshotStorage,
+          rootDir: projectDir,
+        })
+      : reports;
+  const body = renderQaReportComment(renderedReports);
   const hasGitHubTarget = parsed.repository || parsed.pullRequestNumber;
   if (!hasGitHubTarget) {
     console.log(body);
@@ -308,18 +327,20 @@ async function runRenderCommentCommand(parsed: ParsedCli): Promise<number> {
     return 1;
   }
 
-  const githubToken = parsed.githubToken ?? process.env.GITHUB_TOKEN;
-  if (!githubToken) {
-    console.error(
-      "render-comment upsert requires --github-token or GITHUB_TOKEN.",
-    );
+  const githubToken = await resolveGitHubToken({
+    explicitToken: parsed.githubToken,
+    auth: config?.github.auth,
+    apiBaseUrl: process.env.QA_AGENT_GITHUB_API_BASE_URL,
+  });
+  if (!githubToken.ok) {
+    console.error(`render-comment upsert failed: ${githubToken.message}`);
     return 1;
   }
 
   const client = createGitHubCommentClient({
     repository: parsed.repository,
     pullRequestNumber: parsed.pullRequestNumber,
-    token: githubToken,
+    token: githubToken.token,
   });
   const result = await upsertQaReportComment(client, body);
   console.log(`QA Agent comment ${result.action}: ${result.comment.id}`);
@@ -334,16 +355,21 @@ async function runGitHubContextCommand(parsed: ParsedCli): Promise<number> {
     return 1;
   }
 
-  const githubToken = parsed.githubToken ?? process.env.GITHUB_TOKEN;
-  if (!githubToken) {
-    console.error("github-context requires --github-token or GITHUB_TOKEN.");
+  const config = await loadOptionalConfig(parsed);
+  const githubToken = await resolveGitHubToken({
+    explicitToken: parsed.githubToken,
+    auth: config?.github.auth,
+    apiBaseUrl: process.env.QA_AGENT_GITHUB_API_BASE_URL,
+  });
+  if (!githubToken.ok) {
+    console.error(`github-context failed: ${githubToken.message}`);
     return 1;
   }
 
   const result = await writeGitHubPrContext({
     repository: parsed.repository,
     pullRequestNumber: parsed.pullRequestNumber,
-    token: githubToken,
+    token: githubToken.token,
     outPath: resolveProjectPath(parsed.projectDir, parsed.outDir),
     apiBaseUrl: process.env.QA_AGENT_GITHUB_API_BASE_URL,
   });
@@ -353,6 +379,26 @@ async function runGitHubContextCommand(parsed: ParsedCli): Promise<number> {
   }
 
   return result.ok ? 0 : 1;
+}
+
+async function loadOptionalConfig(
+  parsed: ParsedCli,
+): Promise<QaAgentConfig | undefined> {
+  const configPath = resolveConfigPath(parsed);
+  if (!existsSync(configPath)) {
+    return undefined;
+  }
+
+  const result = await loadQaAgentConfig(configPath);
+  if (!result.ok) {
+    throw new Error(
+      `Failed to load QA Agent Config for command options:\n${result.errors
+        .map((error) => `- ${error}`)
+        .join("\n")}`,
+    );
+  }
+
+  return result.config;
 }
 
 function resolveConfigPath(parsed: ParsedCli): string {
@@ -427,7 +473,7 @@ The initializer writes QA Agent config, Android-first workflow files, experiment
   }
 
   if (scope === "render-comment") {
-    console.log(`Usage: qa-agent render-comment [--android-report <path>] [--ios-report <path>] [--repo <owner/name> --pr <number> --github-token <token>]
+    console.log(`Usage: qa-agent render-comment [--android-report <path>] [--ios-report <path>] [--repo <owner/name> --pr <number> --github-token <token>] [--upload-media]
 
 Render a QA Report pull request comment from report fixture JSON files.
 
@@ -437,7 +483,8 @@ Options:
   --ios-report <path>       iOS QA Report JSON file
   --repo <owner/name>       GitHub repository for marker-based comment upsert
   --pr <number>             GitHub pull request number for comment upsert
-  --github-token <token>    GitHub token used for comment upsert; defaults to GITHUB_TOKEN
+  --github-token <token>    GitHub token used for comment upsert; defaults to qa-agent.config.mjs github.auth or GITHUB_TOKEN
+  --upload-media            Upload local report screenshots and recordings when screenshotStorage is vercel-blob
   -h, --help                Show this help message
 
 Without GitHub options, the command prints the rendered Markdown comment to stdout.`);
@@ -454,7 +501,7 @@ Options:
   --repo <owner/name>       GitHub repository
   --pr <number>             GitHub pull request number
   --out <path>              Output PR Context JSON path
-  --github-token <token>    GitHub token used to read PR metadata; defaults to GITHUB_TOKEN
+  --github-token <token>    GitHub token used to read PR metadata; defaults to qa-agent.config.mjs github.auth or GITHUB_TOKEN
   -h, --help                Show this help message
 
 The command writes title, body, labels, branch refs, and changed file paths. It does not include source diffs.`);

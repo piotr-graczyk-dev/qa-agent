@@ -1,6 +1,7 @@
 import { loadQaAgentConfig, type QaAgentConfig } from "./config.js";
 import { checkAgentDeviceAvailability } from "./mobile-device-driver.js";
 import { readAuthProfileSecretEnvNames } from "./auth-profiles.js";
+import { readGitHubAuthEnvNames } from "./github-auth.js";
 
 export type DoctorResult =
   | { ok: true; messages: string[] }
@@ -43,7 +44,9 @@ export async function runDoctor(configPath: string): Promise<DoctorResult> {
       `- App adapter: ${result.config.app.adapter}`,
       `- Target platforms: ${result.config.targetPlatforms.join(", ")}`,
       `- Model: ${result.config.model.provider}/${result.config.model.modelId}`,
+      `- GitHub auth: ${formatGitHubAuth(result.config.github.auth)}`,
       `- Screenshot storage: ${formatScreenshotStorage(result.config.screenshotStorage)}`,
+      `- Recording: ${result.config.recording.enabled ? "enabled" : "disabled"}`,
       `- Mobile Device Driver: agent-device ${agentDevice.ok ? agentDevice.version : "unavailable"}`,
       `- Action safety: ${formatActionSafetyPolicy(result.config.actionSafetyPolicy)}`,
     ],
@@ -62,6 +65,16 @@ function validateCredentials(config: QaAgentConfig): string[] {
     }
   }
 
+  if (config.github.auth.type === "app") {
+    for (const envName of readGitHubAuthEnvNames(config.github.auth)) {
+      if (!process.env[envName]?.trim()) {
+        issues.push(
+          `github.auth: ${formatGitHubAuth(config.github.auth)} requires ${envName} to be set.`,
+        );
+      }
+    }
+  }
+
   for (const [profileName, profile] of Object.entries(config.authProfiles)) {
     for (const envName of readAuthProfileSecretEnvNames({ [profileName]: profile })) {
       if (!process.env[envName]?.trim()) {
@@ -73,6 +86,14 @@ function validateCredentials(config: QaAgentConfig): string[] {
   }
 
   return issues;
+}
+
+function formatGitHubAuth(auth: QaAgentConfig["github"]["auth"]): string {
+  if (auth.type === "token") {
+    return `token (${auth.tokenEnv})`;
+  }
+
+  return `app (${auth.appIdEnv}, ${auth.privateKeyEnv}, ${auth.installationIdEnv})`;
 }
 
 function validateAgentDevice(): string[] {

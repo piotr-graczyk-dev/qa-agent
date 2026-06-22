@@ -1,6 +1,6 @@
 # QA Agent
 
-QA Agent is an open-source CI Runner QA Agent for Expo teams using EAS Workflows. It runs a lightweight Black-Box QA pass against an already installed and launched mobile app, writes a validated QA Report, stores screenshots as workflow artifacts by default, and updates one GitHub pull request comment.
+QA Agent is an open-source CI Runner QA Agent for Expo teams using EAS Workflows. It runs a lightweight Black-Box QA pass against an already installed and launched mobile app, writes a validated QA Report, stores screenshots and optional recordings as workflow artifacts by default, and updates one GitHub pull request comment.
 
 The package and CLI use the neutral name `qa-agent`, but v1 is intentionally Expo/EAS-only. It is not a hosted QA platform, a generic React Native adapter, a deterministic E2E framework, or a replacement for tools such as Maestro, Detox, Appium, XCUITest, or Espresso.
 
@@ -18,7 +18,7 @@ Supported in v1:
 - Android-first QA workflow generation, with an experimental iOS simulator path.
 - Minimal GitHub PR Context from title, body, labels, branch refs, and changed file paths.
 - The `agent-device` Mobile Device Driver.
-- Artifact screenshot storage by default, with optional Vercel Blob metadata.
+- Artifact screenshot and recording storage by default, with optional Vercel Blob upload for inline PR media.
 - Agent Login through configured Auth Profiles with secret isolation.
 - One marker-based GitHub PR comment rendered from Android and/or iOS QA Reports.
 
@@ -46,7 +46,7 @@ Out of scope for the MVP:
    npx qa-agent init --project .
    ```
 
-3. Fill in `qa-agent.config.mjs` with model, EAS, app id, screenshot storage, Action Safety Policy, and Auth Profile settings.
+3. Fill in `qa-agent.config.mjs` with model, EAS, app id, GitHub auth, screenshot/media storage, Action Safety Policy, recording, and Auth Profile settings.
 
 4. Configure EAS workflows and secrets, then run doctor before the first QA Run:
 
@@ -59,13 +59,14 @@ Out of scope for the MVP:
    ```sh
    npx qa-agent github-context --project . --repo owner/repo --pr 123 --out qa-agent/pr-context.json
    npx qa-agent run --project . --platform android --pr-context qa-agent/pr-context.json --out artifacts/qa-agent/android
-   npx qa-agent render-comment --project . --android-report artifacts/qa-agent/android/qa-report.json --repo owner/repo --pr 123
+   npx qa-agent render-comment --project . --android-report artifacts/qa-agent/android/qa-report.json --repo owner/repo --pr 123 --upload-media
    ```
 
 ## Required Secrets and Environment
 
-- `GITHUB_TOKEN` for PR metadata and marker-based comment upsert.
+- `GITHUB_TOKEN` for PR metadata and marker-based comment upsert, or GitHub App credentials configured through `github.auth` (`QA_AGENT_GITHUB_APP_ID`, `QA_AGENT_GITHUB_APP_PRIVATE_KEY`, and `QA_AGENT_GITHUB_APP_INSTALLATION_ID` by default).
 - The model API key named by `model.apiKeyEnv`, for example `QA_AGENT_MODEL_API_KEY`.
+- `BLOB_READ_WRITE_TOKEN` when `screenshotStorage.provider` is `vercel-blob` and `render-comment --upload-media` should embed screenshots and link recordings in the PR comment.
 - `QA_AGENT_ANDROID_APK_PATH` and `QA_AGENT_ANDROID_APPLICATION_ID` for the Android EAS workflow.
 - For experimental iOS, `QA_AGENT_IOS_APP_PATH` and `QA_AGENT_IOS_BUNDLE_IDENTIFIER`.
 - Every Auth Profile secret env var, such as `QA_AGENT_EXAMPLE_EMAIL` and `QA_AGENT_EXAMPLE_PASSWORD` in the example app.

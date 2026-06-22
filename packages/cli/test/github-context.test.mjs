@@ -136,7 +136,7 @@ describe("qa-agent github-context", () => {
 
     assert.equal(result.status, 1);
     assert.equal(result.stdout, "");
-    assert.match(result.stderr, /requires --github-token or GITHUB_TOKEN/);
+    assert.match(result.stderr, /GITHUB_TOKEN to be set, or pass --github-token/);
   });
 
   it("prints help for the command", () => {

@@ -26,6 +26,7 @@ export {
   createGitHubCommentClient,
   loadPlatformReport,
   renderQaReportComment,
+  uploadReportMedia,
   upsertQaReportComment,
   type GitHubComment,
   type GitHubCommentClient,
@@ -34,12 +35,20 @@ export {
   type UpsertQaReportCommentResult,
 } from "./comment.js";
 export {
+  createGitHubAppInstallationToken,
+  createGitHubAppJwt,
+  resolveGitHubToken,
+  type ResolveGitHubTokenInput,
+  type ResolveGitHubTokenResult,
+} from "./github-auth.js";
+export {
   createGitHubPrContextClient,
   writeGitHubPrContext,
   type GitHubContextOptions,
   type GitHubContextResult,
 } from "./github-context.js";
 export {
+  buildRecordingPath,
   buildScreenshotPath,
   checkAgentDeviceAvailability,
   createAgentDeviceDriver,
@@ -53,11 +62,15 @@ export {
 } from "./mobile-device-driver.js";
 export {
   defineQaAgentConfig,
+  githubAuthSchema,
+  githubConfigSchema,
   loadQaAgentConfig,
   qaAgentConfigSchema,
+  recordingSchema,
   screenshotStorageSchema,
   targetPlatformSchema,
   type LoadQaAgentConfigResult,
+  type GitHubAuth,
   type QaAgentConfig,
   type QaAgentConfigInput,
   type ScreenshotStorage,

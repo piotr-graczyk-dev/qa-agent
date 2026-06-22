@@ -35,7 +35,7 @@ export const qaReportIssueSchema = z
   })
   .strict();
 
-export const qaReportScreenshotStorageSchema = z.discriminatedUnion("provider", [
+export const qaReportMediaStorageSchema = z.discriminatedUnion("provider", [
   z
     .object({
       provider: z.literal("artifact"),
@@ -49,16 +49,25 @@ export const qaReportScreenshotStorageSchema = z.discriminatedUnion("provider", 
   z
     .object({
       provider: z.literal("vercel-blob"),
-      url: z.string().trim().url("screenshot url must be a valid URL"),
+      url: z.string().trim().url("media url must be a valid URL"),
     })
     .strict(),
 ]);
+export const qaReportScreenshotStorageSchema = qaReportMediaStorageSchema;
 
 export const qaReportScreenshotSchema = z
   .object({
     path: z.string().trim().min(1, "screenshot path is required"),
     caption: z.string().trim().min(1, "screenshot caption is required").optional(),
-    storage: qaReportScreenshotStorageSchema.optional(),
+    storage: qaReportMediaStorageSchema.optional(),
+  })
+  .strict();
+
+export const qaReportRecordingSchema = z
+  .object({
+    path: z.string().trim().min(1, "recording path is required"),
+    caption: z.string().trim().min(1, "recording caption is required").optional(),
+    storage: qaReportMediaStorageSchema.optional(),
   })
   .strict();
 
@@ -71,6 +80,7 @@ export const qaReportSchema = z
     ),
     issuesFound: z.array(qaReportIssueSchema),
     screenshots: z.array(qaReportScreenshotSchema),
+    recordings: z.array(qaReportRecordingSchema).default([]),
     diagnostics: z.array(z.string().trim().min(1)).optional(),
   })
   .strict();
@@ -127,6 +137,7 @@ export function qaReportOrBlocked(
     checksPerformed: [],
     issuesFound: [],
     screenshots: [],
+    recordings: [],
     diagnostics: [
       ...sanitizeDiagnostics(diagnostics).map(defaultSecretRedactor),
       ...validationDiagnostics.map(defaultSecretRedactor),
