@@ -132,6 +132,11 @@ describe("qa-agent run", () => {
     assert.match(report.summary, /Mocked android QA Run completed/);
     assert.deepEqual(report.issuesFound, []);
     assert.equal(report.screenshots.length, 1);
+    assert.equal(report.screenshots[0].storage.provider, "artifact");
+    assert.match(
+      report.screenshots[0].storage.artifactPath,
+      /qa-agent-android-screen\.png/,
+    );
   });
 
   it("turns an invalid write_report result into a blocked report with diagnostics", () => {

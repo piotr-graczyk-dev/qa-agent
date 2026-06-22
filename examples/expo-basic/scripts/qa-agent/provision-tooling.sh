@@ -24,12 +24,17 @@ require_env() {
 }
 
 require_command "node" "Use the EAS Node image or install Node before this step."
-require_command "agent-device" "Install agent-device for Android before qa-agent run."
 
-if ! agent-device --version >/dev/null 2>&1; then
-  echo "agent-device is installed but did not respond to --version." >&2
-  exit 1
+require_command "npm" "Use the EAS Node image or install npm before this step."
+
+agent_device_package="${QA_AGENT_AGENT_DEVICE_PACKAGE:-agent-device}"
+
+if ! command -v agent-device >/dev/null 2>&1; then
+  echo "Installing agent-device from npm package: $agent_device_package"
+  npm install --global "$agent_device_package"
 fi
+
+agent-device --version
 
 require_env "QA_AGENT_EXAMPLE_EMAIL" "Set it to qa@example.test for deterministic dogfooding."
 require_env "QA_AGENT_EXAMPLE_PASSWORD" "Set it to qa-agent-password for deterministic dogfooding."
