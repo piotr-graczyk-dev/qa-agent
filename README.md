@@ -97,5 +97,5 @@ git diff --check
 bash -n examples/expo-basic/scripts/qa-agent/provision-tooling.sh
 bash -n examples/expo-basic/scripts/qa-agent/prepare-android-app.sh
 bash -n examples/expo-basic/scripts/qa-agent/prepare-ios-app.sh
-stat -f '%Lp %N' examples/expo-basic/scripts/qa-agent/provision-tooling.sh examples/expo-basic/scripts/qa-agent/prepare-android-app.sh examples/expo-basic/scripts/qa-agent/prepare-ios-app.sh
+ls -l examples/expo-basic/scripts/qa-agent/provision-tooling.sh examples/expo-basic/scripts/qa-agent/prepare-android-app.sh examples/expo-basic/scripts/qa-agent/prepare-ios-app.sh
 ```

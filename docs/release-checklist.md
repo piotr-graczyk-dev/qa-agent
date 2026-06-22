@@ -16,7 +16,7 @@ git diff --check
 bash -n examples/expo-basic/scripts/qa-agent/provision-tooling.sh
 bash -n examples/expo-basic/scripts/qa-agent/prepare-android-app.sh
 bash -n examples/expo-basic/scripts/qa-agent/prepare-ios-app.sh
-stat -f '%Lp %N' examples/expo-basic/scripts/qa-agent/provision-tooling.sh examples/expo-basic/scripts/qa-agent/prepare-android-app.sh examples/expo-basic/scripts/qa-agent/prepare-ios-app.sh
+ls -l examples/expo-basic/scripts/qa-agent/provision-tooling.sh examples/expo-basic/scripts/qa-agent/prepare-android-app.sh examples/expo-basic/scripts/qa-agent/prepare-ios-app.sh
 ```
 
 The contract eval command gates the MVP behavior called out in the PRD and ADRs: exactly-once QA Report writing, QA Status classification, explicit `unsure` for missing evidence, `blocked` for missing auth, safe action refusal, and secret redaction.
