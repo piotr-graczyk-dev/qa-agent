@@ -7,7 +7,11 @@ import {
   type AuthRuntimeTools,
   type LoginWithProfileResult,
 } from "./auth-profiles.js";
-import { loadQaAgentConfig, type TargetPlatform } from "./config.js";
+import {
+  loadQaAgentConfig,
+  type ScreenshotStorage,
+  type TargetPlatform,
+} from "./config.js";
 import {
   qaReportOrBlocked,
   validatePrContext,
@@ -142,6 +146,7 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
     options.mockReportPath,
     options.mockRequestedAction,
     redactor,
+    configResult.config.screenshotStorage,
   );
   const report = await collectReportFromEveSession(
     runtime,
@@ -186,6 +191,7 @@ function createFixtureEveRuntime(
   mockReportPath: string | undefined,
   mockRequestedAction: MockableRuntimeActionName | undefined,
   redactor: SecretRedactor,
+  screenshotStorage: ScreenshotStorage,
 ): EveSessionRuntime {
   return {
     async *send(input) {
@@ -286,7 +292,12 @@ function createFixtureEveRuntime(
         mockReportPath === undefined
           ? {
               ok: true as const,
-              value: defaultMockReport(input, screenshot, Boolean(login?.ok)),
+              value: defaultMockReport(
+                input,
+                screenshot,
+                Boolean(login?.ok),
+                screenshotStorage,
+              ),
             }
           : await readMockReport(mockReportPath);
 
@@ -446,6 +457,7 @@ function defaultMockReport(
   input: EveSessionInput,
   screenshot: SuccessfulMobileDeviceToolResult,
   loggedIn: boolean,
+  screenshotStorage: ScreenshotStorage,
 ): QaReport {
   const checksPerformed = [
     "Loaded PR Context",
@@ -459,13 +471,54 @@ function defaultMockReport(
     summary: `Mocked ${input.platform} ${input.mode === "local" ? "local debug " : ""}QA Run completed for PR #${input.prContext.pullRequestNumber}.`,
     checksPerformed,
     issuesFound: [],
-    screenshots: [
-      {
-        path: readScreenshotPath(screenshot, input.outDir, input.platform),
-        caption: "QA Agent mobile screenshot evidence",
-      },
-    ],
+    screenshots: buildScreenshotEvidence(input, screenshot, screenshotStorage),
   };
+}
+
+function buildScreenshotEvidence(
+  input: EveSessionInput,
+  screenshot: SuccessfulMobileDeviceToolResult,
+  screenshotStorage: ScreenshotStorage,
+): QaReport["screenshots"] {
+  const screenshotPath = readScreenshotPath(screenshot, input.outDir, input.platform);
+  return [
+    {
+      path: screenshotPath,
+      caption: "QA Agent mobile screenshot evidence",
+      storage: buildScreenshotStorageMetadata(screenshotPath, screenshotStorage),
+    },
+  ];
+}
+
+function buildScreenshotStorageMetadata(
+  screenshotPath: string,
+  screenshotStorage: ScreenshotStorage,
+): QaReport["screenshots"][number]["storage"] {
+  if (screenshotStorage.provider === "artifact") {
+    return {
+      provider: "artifact",
+      artifactPath: buildArtifactPath(
+        screenshotStorage.artifactsDir,
+        screenshotPath,
+      ),
+    };
+  }
+
+  return undefined;
+}
+
+function buildArtifactPath(artifactsDir: string, screenshotPath: string): string {
+  const normalizedDir = normalizeArtifactPath(artifactsDir).replace(/\/+$/, "");
+  const fileName = path.posix.basename(normalizeArtifactPath(screenshotPath));
+
+  return normalizedDir ? `${normalizedDir}/${fileName}` : fileName;
+}
+
+function normalizeArtifactPath(screenshotPath: string): string {
+  return path
+    .normalize(screenshotPath)
+    .split(path.sep)
+    .join("/");
 }
 
 function readScreenshotPath(

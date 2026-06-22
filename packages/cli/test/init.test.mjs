@@ -73,6 +73,7 @@ describe("qa-agent init", () => {
     assert.match(result.stdout, /created: .*qa-agent\.config\.mjs/);
     assert.match(result.stdout, /created: .*qa-agent-android\.yml/);
     assert.match(result.stdout, /created: .*provision-tooling\.sh/);
+    assert.match(result.stdout, /created: .*prepare-android-app\.sh/);
     assert.equal(result.stderr, "");
 
     const config = await readFile(
@@ -98,13 +99,25 @@ describe("qa-agent init", () => {
       "utf8",
     );
     const provisionIndex = workflow.indexOf("Provision QA Agent tooling");
+    const prContextIndex = workflow.indexOf("Write GitHub PR Context");
     const doctorIndex = workflow.indexOf("qa-agent doctor");
+    const prepareIndex = workflow.indexOf("Install and launch Android QA app");
     const runIndex = workflow.indexOf("qa-agent run");
+    const commentIndex = workflow.indexOf("qa-agent render-comment");
+    assert.ok(prContextIndex > -1);
     assert.ok(provisionIndex > -1);
+    assert.ok(provisionIndex > prContextIndex);
     assert.ok(doctorIndex > provisionIndex);
-    assert.ok(runIndex > doctorIndex);
+    assert.ok(prepareIndex > doctorIndex);
+    assert.ok(runIndex > prepareIndex);
+    assert.ok(commentIndex > runIndex);
     assert.match(workflow, /platform: android/);
+    assert.match(workflow, /gh pr view/);
+    assert.match(workflow, /--pr-context qa-agent\/pr-context\.json/);
+    assert.match(workflow, /--out artifacts\/qa-agent\/android/);
+    assert.match(workflow, /--android-report artifacts\/qa-agent\/android\/qa-report\.json/);
     assert.match(workflow, /scripts\/qa-agent\/provision-tooling\.sh/);
+    assert.match(workflow, /scripts\/qa-agent\/prepare-android-app\.sh/);
 
     const scriptPath = path.join(
       projectDir,
@@ -114,8 +127,23 @@ describe("qa-agent init", () => {
     );
     const script = await readFile(scriptPath, "utf8");
     assert.match(script, /agent-device/);
+    assert.match(script, /agent-device@0\.17\.6/);
+    assert.match(script, /npm install --global/);
     assert.match(script, /secrets, not in this file/);
     assert.equal((await stat(scriptPath)).mode & 0o111, 0o111);
+
+    const prepareScriptPath = path.join(
+      projectDir,
+      "scripts",
+      "qa-agent",
+      "prepare-android-app.sh",
+    );
+    const prepareScript = await readFile(prepareScriptPath, "utf8");
+    assert.match(prepareScript, /QA_AGENT_ANDROID_APK_PATH/);
+    assert.match(prepareScript, /QA_AGENT_ANDROID_APPLICATION_ID/);
+    assert.match(prepareScript, /agent-device install/);
+    assert.match(prepareScript, /agent-device launch/);
+    assert.equal((await stat(prepareScriptPath)).mode & 0o111, 0o111);
 
     assert.equal(
       await readFile(path.join(projectDir, "app.json"), "utf8"),
@@ -137,6 +165,7 @@ describe("qa-agent init", () => {
     assert.match(secondRun.stdout, /unchanged: .*qa-agent\.config\.mjs/);
     assert.match(secondRun.stdout, /unchanged: .*qa-agent-android\.yml/);
     assert.match(secondRun.stdout, /unchanged: .*provision-tooling\.sh/);
+    assert.match(secondRun.stdout, /unchanged: .*prepare-android-app\.sh/);
     assert.equal(secondRun.stderr, "");
   });
 
@@ -174,6 +203,7 @@ describe("qa-agent init", () => {
     assert.match(result.stdout, /skipped: .*qa-agent\.config\.mjs/);
     assert.match(result.stdout, /skipped: .*qa-agent-android\.yml/);
     assert.match(result.stdout, /skipped: .*provision-tooling\.sh/);
+    assert.match(result.stdout, /unchanged: .*prepare-android-app\.sh/);
     assert.equal(result.stderr, "");
     assert.equal(
       await readFile(path.join(projectDir, "qa-agent.config.mjs"), "utf8"),
