@@ -7,6 +7,7 @@ import {
   loadPlatformReport,
   renderQaReportComment,
   upsertQaReportComment,
+  type PlatformReport,
 } from "./comment.js";
 import { runDoctor } from "./doctor.js";
 import { runInit } from "./init.js";
@@ -260,18 +261,24 @@ function parseArgs(argv: string[]): ParsedCli {
 }
 
 async function runRenderCommentCommand(parsed: ParsedCli): Promise<number> {
-  if (!parsed.androidReportPath) {
-    console.error("render-comment requires --android-report <path>.");
+  if (!parsed.androidReportPath && !parsed.iosReportPath) {
+    console.error(
+      "render-comment requires --android-report <path>, --ios-report <path>, or both.",
+    );
     return 1;
   }
 
   const projectDir = path.resolve(parsed.projectDir);
-  const reports = [
-    await loadPlatformReport({
-      platform: "android",
-      path: resolveProjectPath(projectDir, parsed.androidReportPath),
-    }),
-  ];
+  const reports: PlatformReport[] = [];
+
+  if (parsed.androidReportPath) {
+    reports.push(
+      await loadPlatformReport({
+        platform: "android",
+        path: resolveProjectPath(projectDir, parsed.androidReportPath),
+      }),
+    );
+  }
 
   if (parsed.iosReportPath) {
     reports.push(
@@ -366,25 +373,25 @@ function printHelp(
   if (scope === "init") {
     console.log(`Usage: qa-agent init [--project <dir>]
 
-Scaffold Android-first Expo/EAS QA Agent setup files.
+Scaffold Expo/EAS QA Agent setup files.
 
 Options:
   --project <dir>   Project directory where setup files are written
   -h, --help        Show this help message
 
-The initializer writes QA Agent config, EAS workflow, and support scripts only.`);
+The initializer writes QA Agent config, Android-first workflow files, experimental iOS workflow files, and support scripts only.`);
     return;
   }
 
   if (scope === "render-comment") {
-    console.log(`Usage: qa-agent render-comment --android-report <path> [--ios-report <path>] [--repo <owner/name> --pr <number> --github-token <token>]
+    console.log(`Usage: qa-agent render-comment [--android-report <path>] [--ios-report <path>] [--repo <owner/name> --pr <number> --github-token <token>]
 
 Render a QA Report pull request comment from report fixture JSON files.
 
 Options:
   --project <dir>           Project directory used to resolve relative report paths
   --android-report <path>   Android QA Report JSON file
-  --ios-report <path>       Optional iOS QA Report JSON file
+  --ios-report <path>       iOS QA Report JSON file
   --repo <owner/name>       GitHub repository for marker-based comment upsert
   --pr <number>             GitHub pull request number for comment upsert
   --github-token <token>    GitHub token used for comment upsert; defaults to GITHUB_TOKEN
@@ -454,7 +461,7 @@ Local debug mode assumes the app and device are already running. It does not bui
   console.log(`Usage: qa-agent <command>
 
 Commands:
-  init            Scaffold Android-first Expo/EAS QA Agent files
+  init            Scaffold Expo/EAS QA Agent files
   doctor          Validate QA Agent Config
   run             Run a QA Run through the Eve session contract
   run-local       Run a local debug QA Run against an already running app/device

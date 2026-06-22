@@ -77,7 +77,7 @@ describe("qa-agent doctor", () => {
     assert.equal(result.status, 0);
     assert.match(result.stdout, /QA Agent doctor passed/);
     assert.match(result.stdout, /App adapter: expo-eas/);
-    assert.match(result.stdout, /Target platforms: android/);
+    assert.match(result.stdout, /Target platforms: android, ios/);
     assert.equal(result.stderr, "");
   });
 

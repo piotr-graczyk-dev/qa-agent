@@ -62,6 +62,42 @@ function writeConfig(outDir, actionSafetyPolicy) {
   return configPath;
 }
 
+function writeIosConfig(outDir) {
+  const configPath = path.join(outDir, "qa-agent.config.mjs");
+  writeFileSync(
+    configPath,
+    `export default ${JSON.stringify(
+      {
+        targetPlatforms: ["ios"],
+        model: {
+          provider: "openai",
+          modelId: "gpt-4.1",
+          apiKeyEnv: "OPENAI_API_KEY",
+        },
+        app: {
+          adapter: "expo-eas",
+          easProjectId: "00000000-0000-0000-0000-000000000000",
+          ios: {
+            bundleIdentifier: "com.example.qaagent",
+          },
+        },
+        screenshotStorage: {
+          provider: "artifact",
+          artifactsDir: "qa-agent/screenshots",
+        },
+        actionSafetyPolicy: {
+          mode: "safe_only",
+        },
+        authProfiles: {},
+      },
+      null,
+      2,
+    )};\n`,
+    "utf8",
+  );
+  return configPath;
+}
+
 function writeAuthConfig(outDir) {
   const configPath = path.join(outDir, "qa-agent.config.mjs");
   writeFileSync(
@@ -136,6 +172,46 @@ describe("qa-agent run", () => {
     assert.match(
       report.screenshots[0].storage.artifactPath,
       /qa-agent\/screenshots\/qa-agent-android-screen\.png/,
+    );
+  });
+
+  it("executes a mocked iOS QA Run with the same QA Report shape", () => {
+    const outDir = createOutDir();
+    const configPath = writeIosConfig(outDir);
+    const result = runCli([
+      "run",
+      "--project",
+      projectDir,
+      "--config",
+      configPath,
+      "--platform",
+      "ios",
+      "--pr-context",
+      prContextPath,
+      "--out",
+      outDir,
+      "--mock-device-driver",
+    ]);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, /QA Agent run completed/);
+    assert.match(result.stdout, /Platform: ios/);
+    assert.match(result.stdout, /Status: passed/);
+    assert.equal(result.stderr, "");
+    assert.deepEqual(readdirSync(outDir).sort(), [
+      "qa-agent.config.mjs",
+      "qa-report.json",
+    ]);
+
+    const report = readReport(outDir);
+    assert.equal(report.status, "passed");
+    assert.match(report.summary, /Mocked ios QA Run completed/);
+    assert.deepEqual(report.issuesFound, []);
+    assert.equal(report.screenshots.length, 1);
+    assert.equal(report.screenshots[0].storage.provider, "artifact");
+    assert.match(
+      report.screenshots[0].storage.artifactPath,
+      /qa-agent\/screenshots\/qa-agent-ios-screen\.png/,
     );
   });
 

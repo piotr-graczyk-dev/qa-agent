@@ -1,7 +1,7 @@
 import { defineQaAgentConfig } from "qa-agent";
 
 export default defineQaAgentConfig({
-  targetPlatforms: ["android"],
+  targetPlatforms: ["android", "ios"],
   model: {
     provider: "openai",
     modelId: "gpt-4.1",
@@ -12,6 +12,9 @@ export default defineQaAgentConfig({
     easProjectId: "00000000-0000-0000-0000-000000000016",
     android: {
       applicationId: "dev.piotrgraczyk.qaagent.example",
+    },
+    ios: {
+      bundleIdentifier: "dev.piotrgraczyk.qaagent.example",
     },
   },
   screenshotStorage: {
