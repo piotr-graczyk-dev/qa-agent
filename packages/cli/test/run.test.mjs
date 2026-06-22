@@ -135,7 +135,7 @@ describe("qa-agent run", () => {
     assert.equal(report.screenshots[0].storage.provider, "artifact");
     assert.match(
       report.screenshots[0].storage.artifactPath,
-      /qa-agent-android-screen\.png/,
+      /qa-agent\/screenshots\/qa-agent-android-screen\.png/,
     );
   });
 

@@ -365,11 +365,21 @@ function buildScreenshotStorageMetadata(
   if (screenshotStorage.provider === "artifact") {
     return {
       provider: "artifact",
-      artifactPath: normalizeArtifactPath(screenshotPath),
+      artifactPath: buildArtifactPath(
+        screenshotStorage.artifactsDir,
+        screenshotPath,
+      ),
     };
   }
 
   return undefined;
+}
+
+function buildArtifactPath(artifactsDir: string, screenshotPath: string): string {
+  const normalizedDir = normalizeArtifactPath(artifactsDir).replace(/\/+$/, "");
+  const fileName = path.posix.basename(normalizeArtifactPath(screenshotPath));
+
+  return normalizedDir ? `${normalizedDir}/${fileName}` : fileName;
 }
 
 function normalizeArtifactPath(screenshotPath: string): string {

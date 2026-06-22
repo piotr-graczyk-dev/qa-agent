@@ -116,7 +116,7 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-agent_device_package="\${QA_AGENT_AGENT_DEVICE_PACKAGE:-agent-device}"
+agent_device_package="\${QA_AGENT_AGENT_DEVICE_PACKAGE:-agent-device@0.17.6}"
 
 if ! command -v agent-device >/dev/null 2>&1; then
   echo "Installing agent-device from npm package: $agent_device_package"

@@ -127,6 +127,7 @@ describe("qa-agent init", () => {
     );
     const script = await readFile(scriptPath, "utf8");
     assert.match(script, /agent-device/);
+    assert.match(script, /agent-device@0\.17\.6/);
     assert.match(script, /npm install --global/);
     assert.match(script, /secrets, not in this file/);
     assert.equal((await stat(scriptPath)).mode & 0o111, 0o111);

@@ -27,7 +27,7 @@ require_command "node" "Use the EAS Node image or install Node before this step.
 
 require_command "npm" "Use the EAS Node image or install npm before this step."
 
-agent_device_package="${QA_AGENT_AGENT_DEVICE_PACKAGE:-agent-device}"
+agent_device_package="${QA_AGENT_AGENT_DEVICE_PACKAGE:-agent-device@0.17.6}"
 
 if ! command -v agent-device >/dev/null 2>&1; then
   echo "Installing agent-device from npm package: $agent_device_package"
