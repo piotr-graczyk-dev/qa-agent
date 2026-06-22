@@ -21,11 +21,14 @@ The example includes:
 
 - `qa-agent.config.mjs` using the v1 `expo-eas` adapter.
 - `.eas/workflows/qa-agent-android.yml` for Android-first EAS dogfooding.
+- `.eas/workflows/qa-agent-ios.yml` for experimental iOS simulator dogfooding.
 - `qa-agent/pr-context.json` as a deterministic PR Context fixture.
 - `scripts/qa-agent/provision-tooling.sh` as the same provisioning hook that
   `qa-agent init` creates.
 - `scripts/qa-agent/prepare-android-app.sh` to install and launch the APK
   before Black-Box QA starts.
+- `scripts/qa-agent/prepare-ios-app.sh` to install and launch an iOS simulator
+  app before experimental iOS Black-Box QA starts.
 - `eas.json` with a `preview` build profile.
 
 The Auth Profile references environment variables instead of committing real
@@ -46,10 +49,16 @@ The Android workflow also requires:
   EAS workflow.
 - `QA_AGENT_ANDROID_APPLICATION_ID=dev.piotrgraczyk.qaagent.example`.
 
+The experimental iOS workflow also requires:
+
+- `QA_AGENT_IOS_APP_PATH`, pointing at the iOS simulator `.app` produced or
+  downloaded by the EAS workflow.
+- `QA_AGENT_IOS_BUNDLE_IDENTIFIER=dev.piotrgraczyk.qaagent.example`.
+
 Before using the example against a real pull request, replace the deterministic
 `qa-agent/pr-context.json` fixture with the workflow-generated GitHub PR
-Context and make sure EAS retains `artifacts/qa-agent/android` as the QA Report
-and screenshot artifact directory.
+Context and make sure EAS retains `artifacts/qa-agent/android` and, when iOS is
+run, `artifacts/qa-agent/ios` as QA Report and screenshot artifact directories.
 
 For local config validation, install the repo dependencies, build the CLI, and
 run doctor from the repository root with `agent-device` available:
@@ -62,7 +71,10 @@ npx qa-agent doctor --project examples/expo-basic
 The checked-in PR Context is a local dogfood fixture. Replace it with generated
 pull request metadata before using this example as a real project template.
 
-See `docs/eas-android-workflow.md` for the generated workflow setup checklist.
+See `docs/eas-android-workflow.md` for the Android and multi-platform setup
+checklist and `docs/eas-ios-workflow.md` for the experimental iOS path.
+
+The iOS path is experimental until fully dogfooded on EAS runners.
 
 The example is not a product showcase and should stay compact. Add only the
 screens or deterministic states needed to reproduce QA Agent behavior.

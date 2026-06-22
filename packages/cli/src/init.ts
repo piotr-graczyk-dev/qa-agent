@@ -41,6 +41,9 @@ export default defineQaAgentConfig({
     android: {
       applicationId: "TODO_ANDROID_APPLICATION_ID",
     },
+    ios: {
+      bundleIdentifier: "TODO_IOS_BUNDLE_IDENTIFIER",
+    },
   },
   screenshotStorage: {
     provider: "artifact",
@@ -95,7 +98,68 @@ jobs:
           GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: \${{ github.repository }}
           GITHUB_PULL_REQUEST_NUMBER: \${{ github.event.pull_request.number }}
-        run: npx qa-agent render-comment --project . --android-report artifacts/qa-agent/android/qa-report.json --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER"
+        run: |
+          render_args=(--project .)
+          if [[ -f artifacts/qa-agent/android/qa-report.json ]]; then
+            render_args+=(--android-report artifacts/qa-agent/android/qa-report.json)
+          fi
+          if [[ -f artifacts/qa-agent/ios/qa-report.json ]]; then
+            render_args+=(--ios-report artifacts/qa-agent/ios/qa-report.json)
+          fi
+          npx qa-agent render-comment "\${render_args[@]}" --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER"
+`,
+  },
+  {
+    relativePath: ".eas/workflows/qa-agent-ios.yml",
+    contents: `name: QA Agent iOS Experimental
+
+on:
+  pull_request:
+    branches:
+      - "*"
+
+jobs:
+  qa_agent_ios:
+    type: build
+    params:
+      platform: ios
+      profile: preview
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Write GitHub PR Context
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: \${{ github.repository }}
+          GITHUB_PULL_REQUEST_NUMBER: \${{ github.event.pull_request.number }}
+        run: |
+          mkdir -p qa-agent
+          gh pr view "$GITHUB_PULL_REQUEST_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body,labels,baseRefName,headRefName,files --jq '{provider:"github",repository:env.GITHUB_REPOSITORY,pullRequestNumber:(env.GITHUB_PULL_REQUEST_NUMBER|tonumber),title:.title,body:(.body // ""),labels:[.labels[].name],branchRefs:{base:.baseRefName,head:.headRefName},changedFilePaths:[.files[].path]}' > qa-agent/pr-context.json
+      - name: Provision QA Agent tooling
+        run: ./scripts/qa-agent/provision-tooling.sh
+      - name: Validate QA Agent configuration
+        run: npx qa-agent doctor --project .
+      - name: Install and launch iOS QA app
+        env:
+          QA_AGENT_IOS_APP_PATH: TODO_IOS_SIMULATOR_APP_PATH
+          QA_AGENT_IOS_BUNDLE_IDENTIFIER: TODO_IOS_BUNDLE_IDENTIFIER
+        run: ./scripts/qa-agent/prepare-ios-app.sh
+      - name: Run QA Agent
+        run: npx qa-agent run --project . --platform ios --pr-context qa-agent/pr-context.json --out artifacts/qa-agent/ios
+      - name: Render GitHub QA Agent comment
+        env:
+          GITHUB_TOKEN: \${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: \${{ github.repository }}
+          GITHUB_PULL_REQUEST_NUMBER: \${{ github.event.pull_request.number }}
+        run: |
+          render_args=(--project .)
+          if [[ -f artifacts/qa-agent/android/qa-report.json ]]; then
+            render_args+=(--android-report artifacts/qa-agent/android/qa-report.json)
+          fi
+          if [[ -f artifacts/qa-agent/ios/qa-report.json ]]; then
+            render_args+=(--ios-report artifacts/qa-agent/ios/qa-report.json)
+          fi
+          npx qa-agent render-comment "\${render_args[@]}" --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER"
 `,
   },
   {
@@ -104,7 +168,7 @@ jobs:
     contents: `#!/usr/bin/env bash
 set -euo pipefail
 
-echo "Provisioning QA Agent tooling for Android."
+echo "Provisioning QA Agent tooling."
 
 if ! command -v node >/dev/null 2>&1; then
   echo "Node.js is required before running QA Agent." >&2
@@ -167,6 +231,44 @@ agent-device launch --platform android --app-id "$QA_AGENT_ANDROID_APPLICATION_I
 echo "Android QA app is installed and launched."
 `,
   },
+  {
+    relativePath: "scripts/qa-agent/prepare-ios-app.sh",
+    mode: 0o755,
+    contents: `#!/usr/bin/env bash
+set -euo pipefail
+
+require_env() {
+  local env_name="$1"
+  local help="$2"
+
+  if [[ -z "\${!env_name:-}" ]]; then
+    echo "$env_name is required. $help" >&2
+    exit 1
+  fi
+}
+
+require_env "QA_AGENT_IOS_APP_PATH" "Set it to the iOS simulator .app produced or downloaded by the EAS workflow."
+require_env "QA_AGENT_IOS_BUNDLE_IDENTIFIER" "Set it to the iOS bundle identifier from qa-agent.config.mjs."
+
+if ! command -v agent-device >/dev/null 2>&1; then
+  echo "agent-device must be provisioned before preparing the iOS QA app." >&2
+  exit 1
+fi
+
+if [[ ! -e "$QA_AGENT_IOS_APP_PATH" ]]; then
+  echo "iOS simulator app not found at QA_AGENT_IOS_APP_PATH=$QA_AGENT_IOS_APP_PATH" >&2
+  exit 1
+fi
+
+echo "Installing iOS QA app from $QA_AGENT_IOS_APP_PATH."
+agent-device install --platform ios --path "$QA_AGENT_IOS_APP_PATH" --session qa-agent-ios
+
+echo "Launching iOS QA app $QA_AGENT_IOS_BUNDLE_IDENTIFIER."
+agent-device launch --platform ios --app-id "$QA_AGENT_IOS_BUNDLE_IDENTIFIER" --session qa-agent-ios
+
+echo "iOS QA app is installed and launched."
+`,
+  }
 ];
 
 export async function runInit(projectDir: string): Promise<InitResult> {

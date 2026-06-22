@@ -72,8 +72,10 @@ describe("qa-agent init", () => {
     assert.match(result.stdout, /QA Agent init completed/);
     assert.match(result.stdout, /created: .*qa-agent\.config\.mjs/);
     assert.match(result.stdout, /created: .*qa-agent-android\.yml/);
+    assert.match(result.stdout, /created: .*qa-agent-ios\.yml/);
     assert.match(result.stdout, /created: .*provision-tooling\.sh/);
     assert.match(result.stdout, /created: .*prepare-android-app\.sh/);
+    assert.match(result.stdout, /created: .*prepare-ios-app\.sh/);
     assert.equal(result.stderr, "");
 
     const config = await readFile(
@@ -87,6 +89,7 @@ describe("qa-agent init", () => {
     assert.match(config, /apiKeyEnv: "QA_AGENT_MODEL_API_KEY"/);
     assert.match(config, /adapter: "expo-eas"/);
     assert.match(config, /applicationId: "TODO_ANDROID_APPLICATION_ID"/);
+    assert.match(config, /bundleIdentifier: "TODO_IOS_BUNDLE_IDENTIFIER"/);
     assert.match(config, /screenshotStorage/);
     assert.match(config, /provider: "artifact"/);
     assert.match(config, /artifactsDir: "qa-agent\/screenshots"/);
@@ -115,9 +118,33 @@ describe("qa-agent init", () => {
     assert.match(workflow, /gh pr view/);
     assert.match(workflow, /--pr-context qa-agent\/pr-context\.json/);
     assert.match(workflow, /--out artifacts\/qa-agent\/android/);
-    assert.match(workflow, /--android-report artifacts\/qa-agent\/android\/qa-report\.json/);
+    assert.match(workflow, /render_args\+=\(--android-report artifacts\/qa-agent\/android\/qa-report\.json\)/);
+    assert.match(workflow, /render_args\+=\(--ios-report artifacts\/qa-agent\/ios\/qa-report\.json\)/);
     assert.match(workflow, /scripts\/qa-agent\/provision-tooling\.sh/);
     assert.match(workflow, /scripts\/qa-agent\/prepare-android-app\.sh/);
+
+    const iosWorkflow = await readFile(
+      path.join(projectDir, ".eas", "workflows", "qa-agent-ios.yml"),
+      "utf8",
+    );
+    const iosDoctorIndex = iosWorkflow.indexOf("qa-agent doctor");
+    const iosPrepareIndex = iosWorkflow.indexOf("Install and launch iOS QA app");
+    const iosRunIndex = iosWorkflow.indexOf("qa-agent run");
+    const iosCommentIndex = iosWorkflow.indexOf("qa-agent render-comment");
+    assert.match(iosWorkflow, /QA Agent iOS Experimental/);
+    assert.match(iosWorkflow, /platform: ios/);
+    assert.match(iosWorkflow, /profile: preview/);
+    assert.match(iosWorkflow, /QA_AGENT_IOS_APP_PATH: TODO_IOS_SIMULATOR_APP_PATH/);
+    assert.match(iosWorkflow, /QA_AGENT_IOS_BUNDLE_IDENTIFIER: TODO_IOS_BUNDLE_IDENTIFIER/);
+    assert.ok(iosDoctorIndex > -1);
+    assert.ok(iosPrepareIndex > iosDoctorIndex);
+    assert.ok(iosRunIndex > iosPrepareIndex);
+    assert.ok(iosCommentIndex > iosRunIndex);
+    assert.match(iosWorkflow, /--platform ios/);
+    assert.match(iosWorkflow, /--out artifacts\/qa-agent\/ios/);
+    assert.match(iosWorkflow, /render_args\+=\(--android-report artifacts\/qa-agent\/android\/qa-report\.json\)/);
+    assert.match(iosWorkflow, /render_args\+=\(--ios-report artifacts\/qa-agent\/ios\/qa-report\.json\)/);
+    assert.match(iosWorkflow, /scripts\/qa-agent\/prepare-ios-app\.sh/);
 
     const scriptPath = path.join(
       projectDir,
@@ -145,6 +172,19 @@ describe("qa-agent init", () => {
     assert.match(prepareScript, /agent-device launch/);
     assert.equal((await stat(prepareScriptPath)).mode & 0o111, 0o111);
 
+    const prepareIosScriptPath = path.join(
+      projectDir,
+      "scripts",
+      "qa-agent",
+      "prepare-ios-app.sh",
+    );
+    const prepareIosScript = await readFile(prepareIosScriptPath, "utf8");
+    assert.match(prepareIosScript, /QA_AGENT_IOS_APP_PATH/);
+    assert.match(prepareIosScript, /QA_AGENT_IOS_BUNDLE_IDENTIFIER/);
+    assert.match(prepareIosScript, /agent-device install --platform ios/);
+    assert.match(prepareIosScript, /agent-device launch --platform ios/);
+    assert.equal((await stat(prepareIosScriptPath)).mode & 0o111, 0o111);
+
     assert.equal(
       await readFile(path.join(projectDir, "app.json"), "utf8"),
       appJsonBefore,
@@ -164,8 +204,10 @@ describe("qa-agent init", () => {
     assert.equal(secondRun.status, 0);
     assert.match(secondRun.stdout, /unchanged: .*qa-agent\.config\.mjs/);
     assert.match(secondRun.stdout, /unchanged: .*qa-agent-android\.yml/);
+    assert.match(secondRun.stdout, /unchanged: .*qa-agent-ios\.yml/);
     assert.match(secondRun.stdout, /unchanged: .*provision-tooling\.sh/);
     assert.match(secondRun.stdout, /unchanged: .*prepare-android-app\.sh/);
+    assert.match(secondRun.stdout, /unchanged: .*prepare-ios-app\.sh/);
     assert.equal(secondRun.stderr, "");
   });
 
@@ -202,8 +244,10 @@ describe("qa-agent init", () => {
     assert.match(result.stdout, /QA Agent init completed/);
     assert.match(result.stdout, /skipped: .*qa-agent\.config\.mjs/);
     assert.match(result.stdout, /skipped: .*qa-agent-android\.yml/);
+    assert.match(result.stdout, /skipped: .*qa-agent-ios\.yml/);
     assert.match(result.stdout, /skipped: .*provision-tooling\.sh/);
     assert.match(result.stdout, /unchanged: .*prepare-android-app\.sh/);
+    assert.match(result.stdout, /unchanged: .*prepare-ios-app\.sh/);
     assert.equal(result.stderr, "");
     assert.equal(
       await readFile(path.join(projectDir, "qa-agent.config.mjs"), "utf8"),
@@ -238,6 +282,7 @@ describe("qa-agent init", () => {
 
     assert.equal(parentCollision.status, 0);
     assert.match(parentCollision.stdout, /skipped: .*qa-agent-android\.yml/);
+    assert.match(parentCollision.stdout, /skipped: .*qa-agent-ios\.yml/);
     assert.equal(parentCollision.stderr, "");
   });
 

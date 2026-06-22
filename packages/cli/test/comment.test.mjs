@@ -92,6 +92,25 @@ describe("QA Report comment rendering", () => {
     assert.equal(result.stderr, "");
   });
 
+  it("prints an iOS-only QA Report comment through the CLI fixture path", () => {
+    const result = runCli(["render-comment", "--ios-report", iosReportPath]);
+
+    assert.equal(result.status, 0);
+    assert.match(result.stdout, new RegExp(QA_AGENT_COMMENT_MARKER));
+    assert.match(result.stdout, /\| iOS \| Failed \|/);
+    assert.match(result.stdout, /Continue button is hidden/);
+    assert.doesNotMatch(result.stdout, /\| Android \|/);
+    assert.equal(result.stderr, "");
+  });
+
+  it("requires at least one platform report before rendering", () => {
+    const result = runCli(["render-comment"]);
+
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, "");
+    assert.match(result.stderr, /requires --android-report <path>, --ios-report <path>, or both/);
+  });
+
   it("renders screenshot storage metadata as inline links when available", async () => {
     const android = await loadPlatformReport({
       platform: "android",
