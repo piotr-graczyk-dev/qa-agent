@@ -20,6 +20,7 @@ import {
   type QaReport,
 } from "./contracts.js";
 import {
+  buildRecordingPath,
   buildScreenshotPath,
   createAgentDeviceDriver,
   createMobileDeviceRuntimeTools,
@@ -130,6 +131,13 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
   const driver = options.mockDeviceDriver
     ? createMockMobileDeviceDriver()
     : createAgentDeviceDriver({ platform: options.platform });
+  const recordingPath = configResult.config.recording.enabled
+    ? buildRecordingPath(options.outDir, options.platform)
+    : undefined;
+  if (recordingPath) {
+    await mkdir(options.outDir, { recursive: true });
+    await driver.startRecording({ path: recordingPath });
+  }
   const redactor = createAuthProfileRedactor(configResult.config.authProfiles);
   const authProfileName = Object.keys(configResult.config.authProfiles)[0];
   const runtime = createFixtureEveRuntime(
@@ -148,17 +156,41 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
     redactor,
     configResult.config.screenshotStorage,
   );
-  const report = await collectReportFromEveSession(
-    runtime,
-    {
-      message: buildRunMessage(prContextResult.value, options.platform, mode),
-      mode,
-      prContext: prContextResult.value,
-      platform: options.platform,
-      outDir: options.outDir,
-    },
-    redactor,
-  );
+  let report: QaReport;
+  try {
+    report = await collectReportFromEveSession(
+      runtime,
+      {
+        message: buildRunMessage(prContextResult.value, options.platform, mode),
+        mode,
+        prContext: prContextResult.value,
+        platform: options.platform,
+        outDir: options.outDir,
+      },
+      redactor,
+    );
+  } finally {
+    if (recordingPath) {
+      await driver.stopRecording();
+    }
+  }
+
+  if (recordingPath) {
+    report = {
+      ...report,
+      recordings: [
+        ...report.recordings,
+        {
+          path: recordingPath,
+          caption: `${formatPlatform(options.platform)} QA Agent recording`,
+          storage: recordingStorage(
+            configResult.config.screenshotStorage,
+            recordingPath,
+          ),
+        },
+      ],
+    };
+  }
 
   const reportPath = path.join(options.outDir, "qa-report.json");
   await mkdir(options.outDir, { recursive: true });
@@ -182,6 +214,24 @@ export async function runQaAgent(options: RunOptions): Promise<RunResult> {
       `- QA Report: ${reportPath}`,
     ],
   };
+}
+
+function recordingStorage(
+  storage: ScreenshotStorage,
+  recordingPath: string,
+): QaReport["recordings"][number]["storage"] {
+  if (storage.provider !== "artifact") {
+    return undefined;
+  }
+
+  return {
+    provider: "artifact",
+    artifactPath: path.join(storage.artifactsDir, path.basename(recordingPath)),
+  };
+}
+
+function formatPlatform(platform: TargetPlatform): string {
+  return platform === "android" ? "Android" : "iOS";
 }
 
 function createFixtureEveRuntime(
@@ -472,6 +522,7 @@ function defaultMockReport(
     checksPerformed,
     issuesFound: [],
     screenshots: buildScreenshotEvidence(input, screenshot, screenshotStorage),
+    recordings: [],
   };
 }
 

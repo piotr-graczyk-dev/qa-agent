@@ -121,9 +121,49 @@ describe("QA Report comment rendering", () => {
 
     assert.match(
       comment,
-      /\[screenshots\/android\/onboarding\.png\]\(https:\/\/example\.public\.blob\.vercel-storage\.com\/screenshots\/android\/onboarding\.png\)/,
+      /!\[Android onboarding state\]\(https:\/\/example\.public\.blob\.vercel-storage\.com\/screenshots\/android\/onboarding\.png\)/,
     );
     assert.match(comment, /Android onboarding state/);
+  });
+
+  it("renders uploaded screenshots inline and recordings as PR links", () => {
+    const comment = renderQaReportComment([
+      {
+        platform: "android",
+        report: {
+          status: "passed",
+          summary: "Device QA passed.",
+          checksPerformed: ["Captured media"],
+          issuesFound: [],
+          screenshots: [
+            {
+              path: "artifacts/qa-agent/android/screen.png",
+              caption: "Android screen",
+              storage: {
+                provider: "vercel-blob",
+                url: "https://blob.example/screen.png",
+              },
+            },
+          ],
+          recordings: [
+            {
+              path: "artifacts/qa-agent/android/run.mp4",
+              caption: "Android run recording",
+              storage: {
+                provider: "vercel-blob",
+                url: "https://blob.example/run.mp4",
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    assert.match(comment, /!\[Android screen\]\(https:\/\/blob\.example\/screen\.png\)/);
+    assert.match(
+      comment,
+      /\[artifacts\/qa-agent\/android\/run\.mp4\]\(https:\/\/blob\.example\/run\.mp4\) - Android run recording/,
+    );
   });
 
   it("requires complete GitHub target options before upserting", () => {

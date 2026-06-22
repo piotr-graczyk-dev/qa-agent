@@ -4,6 +4,38 @@ import { actionSafetyPolicySchema } from "./action-safety.js";
 import { authProfilesSchema } from "./auth-profiles.js";
 
 export const targetPlatformSchema = z.enum(["android", "ios"]);
+const envNameSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .regex(/^[A-Za-z_][A-Za-z0-9_]*$/, "must be an environment variable name");
+
+export const githubAuthSchema = z
+  .discriminatedUnion("type", [
+    z
+      .object({
+        type: z.literal("token"),
+        tokenEnv: envNameSchema.default("GITHUB_TOKEN"),
+      })
+      .strict(),
+    z
+      .object({
+        type: z.literal("app"),
+        appIdEnv: envNameSchema.default("QA_AGENT_GITHUB_APP_ID"),
+        privateKeyEnv: envNameSchema.default("QA_AGENT_GITHUB_APP_PRIVATE_KEY"),
+        installationIdEnv: envNameSchema.default(
+          "QA_AGENT_GITHUB_APP_INSTALLATION_ID",
+        ),
+      })
+      .strict(),
+  ])
+  .default({ type: "token", tokenEnv: "GITHUB_TOKEN" });
+
+export const githubConfigSchema = z
+  .object({
+    auth: githubAuthSchema,
+  })
+  .default({ auth: { type: "token", tokenEnv: "GITHUB_TOKEN" } });
 
 export const screenshotStorageSchema = z
   .discriminatedUnion("provider", [
@@ -33,6 +65,12 @@ export const screenshotStorageSchema = z
     artifactsDir: "qa-agent/screenshots",
   });
 
+export const recordingSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+  })
+  .default({ enabled: false });
+
 export const qaAgentConfigSchema = z
   .object({
     targetPlatforms: z
@@ -43,7 +81,7 @@ export const qaAgentConfigSchema = z
       modelId: z.string().trim().min(1, "model.modelId is required"),
       apiKeyEnv: z.string().trim().min(1, "model.apiKeyEnv is required"),
     }),
-    app: z.object({
+	    app: z.object({
       adapter: z.literal("expo-eas"),
       easProjectId: z.string().trim().min(1, "app.easProjectId is required"),
       android: z
@@ -61,11 +99,13 @@ export const qaAgentConfigSchema = z
             .trim()
             .min(1, "app.ios.bundleIdentifier is required"),
         })
-        .optional(),
-    }),
-    screenshotStorage: screenshotStorageSchema,
-    actionSafetyPolicy: actionSafetyPolicySchema,
-    authProfiles: authProfilesSchema,
+	        .optional(),
+	    }),
+    github: githubConfigSchema,
+	    screenshotStorage: screenshotStorageSchema,
+    recording: recordingSchema,
+	    actionSafetyPolicy: actionSafetyPolicySchema,
+	    authProfiles: authProfilesSchema,
   })
   .superRefine((config, ctx) => {
     if (config.targetPlatforms.includes("android") && !config.app.android) {
@@ -88,6 +128,7 @@ export const qaAgentConfigSchema = z
   });
 
 export type TargetPlatform = z.infer<typeof targetPlatformSchema>;
+export type GitHubAuth = z.infer<typeof githubAuthSchema>;
 export type ScreenshotStorage = z.infer<typeof screenshotStorageSchema>;
 export type QaAgentConfig = z.infer<typeof qaAgentConfigSchema>;
 export type QaAgentConfigInput = z.input<typeof qaAgentConfigSchema>;

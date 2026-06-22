@@ -17,9 +17,18 @@ export default defineQaAgentConfig({
       bundleIdentifier: "dev.piotrgraczyk.qaagent.example",
     },
   },
+  github: {
+    auth: {
+      type: "token",
+      tokenEnv: "GITHUB_TOKEN",
+    },
+  },
   screenshotStorage: {
     provider: "artifact",
     artifactsDir: "qa-agent/screenshots",
+  },
+  recording: {
+    enabled: true,
   },
   actionSafetyPolicy: {
     mode: "safe_only",

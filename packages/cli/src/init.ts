@@ -45,9 +45,28 @@ export default defineQaAgentConfig({
       bundleIdentifier: "TODO_IOS_BUNDLE_IDENTIFIER",
     },
   },
+  github: {
+    auth: {
+      type: "token",
+      tokenEnv: "GITHUB_TOKEN",
+    },
+    // To publish PR comments as a bot, use:
+    // auth: {
+    //   type: "app",
+    //   appIdEnv: "QA_AGENT_GITHUB_APP_ID",
+    //   privateKeyEnv: "QA_AGENT_GITHUB_APP_PRIVATE_KEY",
+    //   installationIdEnv: "QA_AGENT_GITHUB_APP_INSTALLATION_ID",
+    // },
+  },
   screenshotStorage: {
     provider: "artifact",
     artifactsDir: "qa-agent/screenshots",
+    // To embed screenshots/recordings in PR comments, switch to:
+    // provider: "vercel-blob",
+    // tokenEnv: "BLOB_READ_WRITE_TOKEN",
+  },
+  recording: {
+    enabled: true,
   },
   actionSafetyPolicy: {
     mode: "safe_only",
@@ -106,7 +125,7 @@ jobs:
           if [[ -f artifacts/qa-agent/ios/qa-report.json ]]; then
             render_args+=(--ios-report artifacts/qa-agent/ios/qa-report.json)
           fi
-          npx qa-agent render-comment "\${render_args[@]}" --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER"
+          npx qa-agent render-comment "\${render_args[@]}" --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER" --upload-media
 `,
   },
   {
@@ -159,7 +178,7 @@ jobs:
           if [[ -f artifacts/qa-agent/ios/qa-report.json ]]; then
             render_args+=(--ios-report artifacts/qa-agent/ios/qa-report.json)
           fi
-          npx qa-agent render-comment "\${render_args[@]}" --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER"
+          npx qa-agent render-comment "\${render_args[@]}" --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER" --upload-media
 `,
   },
   {
@@ -223,10 +242,10 @@ if [[ ! -f "$QA_AGENT_ANDROID_APK_PATH" ]]; then
 fi
 
 echo "Installing Android QA app from $QA_AGENT_ANDROID_APK_PATH."
-agent-device install --platform android --path "$QA_AGENT_ANDROID_APK_PATH" --session qa-agent-android
+agent-device install "$QA_AGENT_ANDROID_APPLICATION_ID" "$QA_AGENT_ANDROID_APK_PATH" --platform android --session qa-agent-android
 
 echo "Launching Android QA app $QA_AGENT_ANDROID_APPLICATION_ID."
-agent-device launch --platform android --app-id "$QA_AGENT_ANDROID_APPLICATION_ID" --session qa-agent-android
+agent-device open "$QA_AGENT_ANDROID_APPLICATION_ID" --platform android --session qa-agent-android
 
 echo "Android QA app is installed and launched."
 `,
@@ -261,10 +280,10 @@ if [[ ! -e "$QA_AGENT_IOS_APP_PATH" ]]; then
 fi
 
 echo "Installing iOS QA app from $QA_AGENT_IOS_APP_PATH."
-agent-device install --platform ios --path "$QA_AGENT_IOS_APP_PATH" --session qa-agent-ios
+agent-device install "$QA_AGENT_IOS_BUNDLE_IDENTIFIER" "$QA_AGENT_IOS_APP_PATH" --platform ios --session qa-agent-ios
 
 echo "Launching iOS QA app $QA_AGENT_IOS_BUNDLE_IDENTIFIER."
-agent-device launch --platform ios --app-id "$QA_AGENT_IOS_BUNDLE_IDENTIFIER" --session qa-agent-ios
+agent-device open "$QA_AGENT_IOS_BUNDLE_IDENTIFIER" --platform ios --session qa-agent-ios
 
 echo "iOS QA app is installed and launched."
 `,

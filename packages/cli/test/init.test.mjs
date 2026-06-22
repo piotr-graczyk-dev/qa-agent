@@ -91,8 +91,13 @@ describe("qa-agent init", () => {
     assert.match(config, /applicationId: "TODO_ANDROID_APPLICATION_ID"/);
     assert.match(config, /bundleIdentifier: "TODO_IOS_BUNDLE_IDENTIFIER"/);
     assert.match(config, /screenshotStorage/);
+    assert.match(config, /github/);
+    assert.match(config, /type: "token"/);
+    assert.match(config, /tokenEnv: "GITHUB_TOKEN"/);
     assert.match(config, /provider: "artifact"/);
     assert.match(config, /artifactsDir: "qa-agent\/screenshots"/);
+    assert.match(config, /recording/);
+    assert.match(config, /enabled: true/);
     assert.match(config, /actionSafetyPolicy/);
     assert.match(config, /mode: "safe_only"/);
     assert.match(config, /authProfiles: \{\}/);
@@ -120,6 +125,7 @@ describe("qa-agent init", () => {
     assert.match(workflow, /--out artifacts\/qa-agent\/android/);
     assert.match(workflow, /render_args\+=\(--android-report artifacts\/qa-agent\/android\/qa-report\.json\)/);
     assert.match(workflow, /render_args\+=\(--ios-report artifacts\/qa-agent\/ios\/qa-report\.json\)/);
+    assert.match(workflow, /--upload-media/);
     assert.match(workflow, /scripts\/qa-agent\/provision-tooling\.sh/);
     assert.match(workflow, /scripts\/qa-agent\/prepare-android-app\.sh/);
 
@@ -145,6 +151,7 @@ describe("qa-agent init", () => {
     assert.match(iosWorkflow, /--out artifacts\/qa-agent\/ios/);
     assert.match(iosWorkflow, /render_args\+=\(--android-report artifacts\/qa-agent\/android\/qa-report\.json\)/);
     assert.match(iosWorkflow, /render_args\+=\(--ios-report artifacts\/qa-agent\/ios\/qa-report\.json\)/);
+    assert.match(iosWorkflow, /--upload-media/);
     assert.match(iosWorkflow, /scripts\/qa-agent\/prepare-ios-app\.sh/);
 
     const scriptPath = path.join(
@@ -170,7 +177,7 @@ describe("qa-agent init", () => {
     assert.match(prepareScript, /QA_AGENT_ANDROID_APK_PATH/);
     assert.match(prepareScript, /QA_AGENT_ANDROID_APPLICATION_ID/);
     assert.match(prepareScript, /agent-device install/);
-    assert.match(prepareScript, /agent-device launch/);
+    assert.match(prepareScript, /agent-device open/);
     assert.equal((await stat(prepareScriptPath)).mode & 0o111, 0o111);
 
     const prepareIosScriptPath = path.join(
@@ -182,8 +189,8 @@ describe("qa-agent init", () => {
     const prepareIosScript = await readFile(prepareIosScriptPath, "utf8");
     assert.match(prepareIosScript, /QA_AGENT_IOS_APP_PATH/);
     assert.match(prepareIosScript, /QA_AGENT_IOS_BUNDLE_IDENTIFIER/);
-    assert.match(prepareIosScript, /agent-device install --platform ios/);
-    assert.match(prepareIosScript, /agent-device launch --platform ios/);
+    assert.match(prepareIosScript, /agent-device install "\$QA_AGENT_IOS_BUNDLE_IDENTIFIER"/);
+    assert.match(prepareIosScript, /agent-device open "\$QA_AGENT_IOS_BUNDLE_IDENTIFIER"/);
     assert.equal((await stat(prepareIosScriptPath)).mode & 0o111, 0o111);
 
     assert.equal(

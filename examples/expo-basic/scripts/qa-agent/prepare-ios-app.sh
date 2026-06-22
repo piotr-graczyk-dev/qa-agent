@@ -25,9 +25,9 @@ if [[ ! -e "$QA_AGENT_IOS_APP_PATH" ]]; then
 fi
 
 echo "Installing iOS QA app from $QA_AGENT_IOS_APP_PATH."
-agent-device install --platform ios --path "$QA_AGENT_IOS_APP_PATH" --session qa-agent-ios
+agent-device install "$QA_AGENT_IOS_BUNDLE_IDENTIFIER" "$QA_AGENT_IOS_APP_PATH" --platform ios --session qa-agent-ios
 
 echo "Launching iOS QA app $QA_AGENT_IOS_BUNDLE_IDENTIFIER."
-agent-device launch --platform ios --app-id "$QA_AGENT_IOS_BUNDLE_IDENTIFIER" --session qa-agent-ios
+agent-device open "$QA_AGENT_IOS_BUNDLE_IDENTIFIER" --platform ios --session qa-agent-ios
 
 echo "iOS QA app is installed and launched."

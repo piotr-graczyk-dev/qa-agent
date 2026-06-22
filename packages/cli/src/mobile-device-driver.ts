@@ -23,6 +23,8 @@ export type MobileDeviceDriver = {
   goBack(input?: { system?: boolean }): Promise<MobileDeviceCommandResult>;
   openDeepLink(input: { url: string }): Promise<MobileDeviceCommandResult>;
   takeScreenshot(input: { path: string }): Promise<MobileDeviceCommandResult>;
+  startRecording(input: { path: string }): Promise<MobileDeviceCommandResult>;
+  stopRecording(): Promise<MobileDeviceCommandResult>;
 };
 
 export type MobileDeviceToolResult =
@@ -149,6 +151,16 @@ export function createAgentDeviceDriver(
         runCommand,
       );
     },
+    startRecording(input) {
+      return runDriverCommand(
+        bin,
+        ["record", "start", input.path, ...commonFlags],
+        runCommand,
+      );
+    },
+    stopRecording() {
+      return runDriverCommand(bin, ["record", "stop", ...commonFlags], runCommand);
+    },
   };
 }
 
@@ -187,6 +199,12 @@ export function createMockMobileDeviceDriver(): MobileDeviceDriver {
         path: input.path,
         caption: "Mocked fixture home screen",
       });
+    },
+    async startRecording(input) {
+      return commandResult("agent-device record start", { path: input.path });
+    },
+    async stopRecording() {
+      return commandResult("agent-device record stop", { stopped: true });
     },
   };
 }
@@ -249,6 +267,10 @@ export function createMobileDeviceRuntimeTools(
 
 export function buildScreenshotPath(outDir: string, platform: TargetPlatform): string {
   return path.join(outDir, `qa-agent-${platform}-screen.png`);
+}
+
+export function buildRecordingPath(outDir: string, platform: TargetPlatform): string {
+  return path.join(outDir, `qa-agent-${platform}-recording.mp4`);
 }
 
 async function runPolicyGuardedTool(input: {
