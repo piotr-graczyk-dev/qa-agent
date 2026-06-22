@@ -115,7 +115,7 @@ describe("qa-agent init", () => {
     assert.ok(runIndex > prepareIndex);
     assert.ok(commentIndex > runIndex);
     assert.match(workflow, /platform: android/);
-    assert.match(workflow, /gh pr view/);
+    assert.match(workflow, /qa-agent github-context/);
     assert.match(workflow, /--pr-context qa-agent\/pr-context\.json/);
     assert.match(workflow, /--out artifacts\/qa-agent\/android/);
     assert.match(workflow, /render_args\+=\(--android-report artifacts\/qa-agent\/android\/qa-report\.json\)/);
@@ -132,6 +132,7 @@ describe("qa-agent init", () => {
     const iosRunIndex = iosWorkflow.indexOf("qa-agent run");
     const iosCommentIndex = iosWorkflow.indexOf("qa-agent render-comment");
     assert.match(iosWorkflow, /QA Agent iOS Experimental/);
+    assert.match(iosWorkflow, /qa-agent github-context/);
     assert.match(iosWorkflow, /platform: ios/);
     assert.match(iosWorkflow, /profile: preview/);
     assert.match(iosWorkflow, /QA_AGENT_IOS_APP_PATH: TODO_IOS_SIMULATOR_APP_PATH/);

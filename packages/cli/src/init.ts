@@ -81,7 +81,7 @@ jobs:
           GITHUB_PULL_REQUEST_NUMBER: \${{ github.event.pull_request.number }}
         run: |
           mkdir -p qa-agent
-          gh pr view "$GITHUB_PULL_REQUEST_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body,labels,baseRefName,headRefName,files --jq '{provider:"github",repository:env.GITHUB_REPOSITORY,pullRequestNumber:(env.GITHUB_PULL_REQUEST_NUMBER|tonumber),title:.title,body:(.body // ""),labels:[.labels[].name],branchRefs:{base:.baseRefName,head:.headRefName},changedFilePaths:[.files[].path]}' > qa-agent/pr-context.json
+          npx qa-agent github-context --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER" --out qa-agent/pr-context.json
       - name: Provision QA Agent tooling
         run: ./scripts/qa-agent/provision-tooling.sh
       - name: Validate QA Agent configuration
@@ -134,7 +134,7 @@ jobs:
           GITHUB_PULL_REQUEST_NUMBER: \${{ github.event.pull_request.number }}
         run: |
           mkdir -p qa-agent
-          gh pr view "$GITHUB_PULL_REQUEST_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body,labels,baseRefName,headRefName,files --jq '{provider:"github",repository:env.GITHUB_REPOSITORY,pullRequestNumber:(env.GITHUB_PULL_REQUEST_NUMBER|tonumber),title:.title,body:(.body // ""),labels:[.labels[].name],branchRefs:{base:.baseRefName,head:.headRefName},changedFilePaths:[.files[].path]}' > qa-agent/pr-context.json
+          npx qa-agent github-context --repo "$GITHUB_REPOSITORY" --pr "$GITHUB_PULL_REQUEST_NUMBER" --out qa-agent/pr-context.json
       - name: Provision QA Agent tooling
         run: ./scripts/qa-agent/provision-tooling.sh
       - name: Validate QA Agent configuration

@@ -10,6 +10,7 @@ import {
   type PlatformReport,
 } from "./comment.js";
 import { runDoctor } from "./doctor.js";
+import { writeGitHubPrContext } from "./github-context.js";
 import { runInit } from "./init.js";
 import {
   MOCKABLE_RUNTIME_ACTION_NAMES,
@@ -63,7 +64,9 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
               ? "run-local"
               : parsed.command === "render-comment"
                 ? "render-comment"
-                : "root",
+                : parsed.command === "github-context"
+                  ? "github-context"
+                  : "root",
     );
     return 0;
   }
@@ -115,6 +118,10 @@ export async function main(argv = process.argv.slice(2)): Promise<number> {
 
   if (parsed.command === "render-comment") {
     return await runRenderCommentCommand(parsed);
+  }
+
+  if (parsed.command === "github-context") {
+    return await runGitHubContextCommand(parsed);
   }
 
   if (parsed.command !== "doctor") {
@@ -319,6 +326,35 @@ async function runRenderCommentCommand(parsed: ParsedCli): Promise<number> {
   return 0;
 }
 
+async function runGitHubContextCommand(parsed: ParsedCli): Promise<number> {
+  if (!parsed.repository || !parsed.pullRequestNumber || !parsed.outDir) {
+    console.error(
+      "github-context requires --repo <owner/name>, --pr <number>, and --out <path>.",
+    );
+    return 1;
+  }
+
+  const githubToken = parsed.githubToken ?? process.env.GITHUB_TOKEN;
+  if (!githubToken) {
+    console.error("github-context requires --github-token or GITHUB_TOKEN.");
+    return 1;
+  }
+
+  const result = await writeGitHubPrContext({
+    repository: parsed.repository,
+    pullRequestNumber: parsed.pullRequestNumber,
+    token: githubToken,
+    outPath: resolveProjectPath(parsed.projectDir, parsed.outDir),
+    apiBaseUrl: process.env.QA_AGENT_GITHUB_API_BASE_URL,
+  });
+  const output = result.ok ? console.log : console.error;
+  for (const message of result.messages) {
+    output(message);
+  }
+
+  return result.ok ? 0 : 1;
+}
+
 function resolveConfigPath(parsed: ParsedCli): string {
   const projectDir = path.resolve(parsed.projectDir);
   if (parsed.configPath) {
@@ -368,7 +404,14 @@ function isMockableRuntimeActionName(
 }
 
 function printHelp(
-  scope: "root" | "init" | "doctor" | "run" | "run-local" | "render-comment",
+  scope:
+    | "root"
+    | "init"
+    | "doctor"
+    | "run"
+    | "run-local"
+    | "render-comment"
+    | "github-context",
 ): void {
   if (scope === "init") {
     console.log(`Usage: qa-agent init [--project <dir>]
@@ -398,6 +441,23 @@ Options:
   -h, --help                Show this help message
 
 Without GitHub options, the command prints the rendered Markdown comment to stdout.`);
+    return;
+  }
+
+  if (scope === "github-context") {
+    console.log(`Usage: qa-agent github-context --repo <owner/name> --pr <number> --out <path> [--github-token <token>]
+
+Write minimal GitHub PR Context JSON for a QA Run.
+
+Options:
+  --project <dir>           Project directory used to resolve the output path
+  --repo <owner/name>       GitHub repository
+  --pr <number>             GitHub pull request number
+  --out <path>              Output PR Context JSON path
+  --github-token <token>    GitHub token used to read PR metadata; defaults to GITHUB_TOKEN
+  -h, --help                Show this help message
+
+The command writes title, body, labels, branch refs, and changed file paths. It does not include source diffs.`);
     return;
   }
 
@@ -466,12 +526,14 @@ Commands:
   run             Run a QA Run through the Eve session contract
   run-local       Run a local debug QA Run against an already running app/device
   render-comment  Render or upsert the single QA Agent PR comment
+  github-context   Write minimal GitHub PR Context JSON
 
 Run "qa-agent init --help" for command options.
 Run "qa-agent doctor --help" for command options.
 Run "qa-agent run --help" for command options.
 Run "qa-agent run-local --help" for command options.
-Run "qa-agent render-comment --help" for command options.`);
+Run "qa-agent render-comment --help" for command options.
+Run "qa-agent github-context --help" for command options.`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

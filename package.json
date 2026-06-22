@@ -13,6 +13,7 @@
   "scripts": {
     "build": "eve build",
     "dev": "eve dev",
+    "eval:contracts": "npm run build --workspace qa-agent && node --test packages/cli/evals/*.test.mjs",
     "pretest": "npm run build --workspace qa-agent",
     "start": "eve start",
     "test": "node --test packages/cli/test",

@@ -16,6 +16,7 @@
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "eval:contracts": "npm run build && node --test evals/*.test.mjs",
     "pretest": "npm run build",
     "test": "node --test test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
